@@ -3633,13 +3633,19 @@ function openImportPagoModal(){
             `).join('')}
           </div>` : ''}
           ${persona ? `<div class="section-hint" style="margin-top:10px; font-weight:600;">Total a pagar (días + reembolsos): ${fmtMoney(parsedEntries.filter(e=>e.incluir).reduce((s,e)=>s+totalEntrada(e,persona),0) + totalGastos)}</div>` : ''}
-          <div class="field-row" style="margin-top:10px;">
-            <div class="field"><label>Fecha del pago</label><input type="date" name="fechaPago" value="${todayStr()}"></div>
-            <div class="field"><label>Caja de donde sale</label>
-              <select name="cajaIdPago">${state.cajas.map(cc=>`<option value="${cc.id}" ${cc.administradorId===(adminUnlocked&&adminUnlocked.id)?'selected':''}>${cc.nombre}</option>`).join('')}</select>
+          <div class="checkline" style="margin-top:10px;"><input type="checkbox" name="dejarPendiente" id="chkDejarPendiente"><label for="chkDejarPendiente">Dejar pendiente de pago (solo registrar los días y gastos, sin generar el pago ni descontar de una caja todavía)</label></div>
+          <div id="wrapFechaCaja">
+            <div class="field-row" style="margin-top:10px;">
+              <div class="field"><label>Fecha del pago</label><input type="date" name="fechaPago" value="${todayStr()}"></div>
+              <div class="field"><label>Caja de donde sale</label>
+                <select name="cajaIdPago">${state.cajas.map(cc=>`<option value="${cc.id}" ${cc.administradorId===(adminUnlocked&&adminUnlocked.id)?'selected':''}>${cc.nombre}</option>`).join('')}</select>
+              </div>
             </div>
           </div>
         `;
+        document.getElementById('chkDejarPendiente').addEventListener('change', (e)=>{
+          document.getElementById('wrapFechaCaja').style.display = e.target.checked ? 'none' : '';
+        });
         document.getElementById('importPagoPersonaSel').addEventListener('change', (e)=>{ parsedPersonaId = e.target.value || null; renderImportPagoPreview(); });
         el.querySelectorAll('[data-imp-pago-idx]').forEach(chk=>{
           chk.addEventListener('change', ()=>{ parsedEntries[Number(chk.dataset.impPagoIdx)].incluir = chk.checked; renderImportPagoPreview(); });
@@ -3653,6 +3659,7 @@ function openImportPagoModal(){
       if(parsedEntries.length===0 && parsedGastos.length===0){ alert('Primero tocá "Analizar texto".'); return; }
       if(!parsedPersonaId){ alert('Elegí a qué persona del equipo corresponden estos registros.'); return; }
       const persona = personaDe(parsedPersonaId);
+      const dejarPendiente = form.dejarPendiente.checked;
       const fechaPago = form.fechaPago.value || todayStr();
       const cajaId = form.cajaIdPago.value;
       let total = 0;
@@ -3669,6 +3676,7 @@ function openImportPagoModal(){
           fueraAsuncion: e.fueraAsuncion, descripcion: e.descripcion,
           tarifaBase: tarifa, extensionTipo:'ninguna', extensionMonto:0, extensionDescripcion:'',
           horasExtra: e.horasExtra||0, tragosExtraCantidad: e.tragosExtra||0, tragosExtraBartenders: e.bartenders||1,
+          pagado: !dejarPendiente,
         });
       });
       parsedGastos.filter(g=>g.incluir).forEach(g=>{
@@ -3676,14 +3684,18 @@ function openImportPagoModal(){
         detalles.push(`reembolso: ${g.descripcion||''}`);
         state.gastosPersonal.push({
           id: uid(), personaId: parsedPersonaId, fecha: g.fecha, descripcion: g.descripcion,
-          monto: g.monto, origen: 'worker', pagado: true, pagoId: null, registradoPor: adminUnlocked.nombre,
+          monto: g.monto, origen: 'worker', pagado: !dejarPendiente, pagoId: null, registradoPor: adminUnlocked.nombre,
         });
       });
-      state.pagos.push({
-        id: uid(), personaId: parsedPersonaId, eventoId: null, fecha: fechaPago, monto: total,
-        descripcion: `Pago por reporte de staff (${detalles.join(', ')})`, cajaId, adminId: adminUnlocked.id,
-      });
-      pushLog(adminUnlocked.nombre, 'Pago creado desde reporte de staff', `${fmtMoney(total)} — ${persona?persona.nombre:''}`);
+      if(dejarPendiente){
+        pushLog(adminUnlocked.nombre, 'Reporte de staff registrado como pendiente', `${fmtMoney(total)} — ${persona?persona.nombre:''} (sin pagar todavía)`);
+      } else {
+        state.pagos.push({
+          id: uid(), personaId: parsedPersonaId, eventoId: null, fecha: fechaPago, monto: total,
+          descripcion: `Pago por reporte de staff (${detalles.join(', ')})`, cajaId, adminId: adminUnlocked.id,
+        });
+        pushLog(adminUnlocked.nombre, 'Pago creado desde reporte de staff', `${fmtMoney(total)} — ${persona?persona.nombre:''}`);
+      }
       saveState(); closeModal(); render();
     },
   };
