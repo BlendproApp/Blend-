@@ -654,7 +654,7 @@ const ROLES = ['Bartender','Bachera','Logística','Producción','Limpieza','Otro
 const TIPOS_TRABAJO = ['Logística','Limpieza','Producción'];
 const ACCIONES_LOG_LIMITE = 500;
 
-let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [] };
+let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [] };
 let colaboradorLimitadoUnlocked = null;
 let currentTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
 function toggleTheme(){
@@ -750,6 +750,7 @@ async function loadState(){
       state.tiposEvento = parsed.tiposEvento !== undefined ? parsed.tiposEvento : ['Corporativo','Boda','Cumpleaños','Quince años','Otro'];
       state.gastosPersonal = parsed.gastosPersonal || [];
       state.colaboradoresLimitados = parsed.colaboradoresLimitados || [];
+      state.cargosAdicionales = parsed.cargosAdicionales || [];
       migrarProduccionAntigua();
       migrarRecetarioNuevosTragos();
     }
@@ -808,6 +809,7 @@ async function saveState(){
       insumos: state.insumos, movimientosInsumo: state.movimientosInsumo,
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
+      cargosAdicionales: state.cargosAdicionales,
     });
     storageOk = true;
   }catch(e){
@@ -823,6 +825,8 @@ function pushLog(actor, accion, detalle){
 }
 
 const HORA_ADICIONAL_STAFF_PRECIO = 50000;
+const TIPOS_CARGO_ADICIONAL = { horaAdicional:'Hora adicional', tragoAdicional:'Trago adicional', averia:'Avería / pérdida' };
+const AVERIA_PRECIO_DEFAULT = 50000;
 function tragoAdicionalPrecio(bartenders){
   bartenders = Number(bartenders) || 1;
   if(bartenders<=1) return 2000;
@@ -892,9 +896,12 @@ function seedPresupuestoConfig(){
 }
 
 function cobradoEvento(eventoId){ return sumaWhere(state.cobros, c=>c.eventoId===eventoId); }
+function cargosAdicionalesPendientesEvento(eventoId){
+  return sumaWhere(state.cargosAdicionales, c=>c.eventoId===eventoId && !c.cobrado);
+}
 function saldoPendienteEvento(ev){
-  if(ev.pagadoTotal) return 0;
-  return (Number(ev.montoTotal)||0) - cobradoEvento(ev.id);
+  const base = ev.pagadoTotal ? 0 : (Number(ev.montoTotal)||0) - cobradoEvento(ev.id);
+  return base + cargosAdicionalesPendientesEvento(ev.id);
 }
 
 function stockInsumo(insumoId){
@@ -1434,6 +1441,11 @@ function eventoFormFields(ev){
       <div class="field"><label>Horario de montaje</label><input type="time" name="horarioMontaje" value="${ev.horarioMontaje||''}"></div>
     </div>
     <div class="field-row">
+      <div class="field"><label>Precio hora adicional (de este evento)</label><input type="number" name="precioHoraAdicionalEvento" value="${ev.precioHoraAdicionalEvento||''}"></div>
+      <div class="field"><label>Precio trago adicional (de este evento)</label><input type="number" name="precioTragoAdicionalEvento" value="${ev.precioTragoAdicionalEvento||''}"></div>
+    </div>
+    <div class="section-hint" style="margin:-10px 0 14px;">Se van a sugerir como precio al cargar un "Cargo adicional" para este evento en particular — cada evento puede tener valores distintos.</div>
+    <div class="field-row">
       <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos" value="${ev.adultos||0}"></div>
       <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes" value="${ev.jovenes||0}"></div>
     </div>
@@ -1648,6 +1660,37 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
             saveState(); closeModal(); render();
           });
         }
+        const selTipoCargo = modalEl.querySelector('#tipoCargoAdicional');
+        const inputPrecioCargo = modalEl.querySelector('#precioCargoAdicional');
+        if(selTipoCargo){
+          selTipoCargo.addEventListener('change', ()=>{
+            const cfg = state.presupuestoConfig || {};
+            if(selTipoCargo.value==='horaAdicional') inputPrecioCargo.value = ev.precioHoraAdicionalEvento || cfg.precioHoraAdicional || HORA_ADICIONAL_STAFF_PRECIO;
+            else if(selTipoCargo.value==='tragoAdicional') inputPrecioCargo.value = ev.precioTragoAdicionalEvento || cfg.precioTragoConAlcohol || 0;
+            else inputPrecioCargo.value = AVERIA_PRECIO_DEFAULT;
+          });
+        }
+        const btnAgregarCargoAdicional = modalEl.querySelector('#btnAgregarCargoAdicional');
+        if(btnAgregarCargoAdicional){
+          btnAgregarCargoAdicional.addEventListener('click', ()=>{
+            const cf = modalEl.querySelector('#cargoAdicionalForm');
+            const tipo = cf.querySelector('[name="tipoCargo"]').value;
+            const cantidad = Number(cf.querySelector('[name="cantidadCargo"]').value)||0;
+            const precio = Number(cf.querySelector('[name="precioCargo"]').value)||0;
+            const descripcion = cf.querySelector('[name="descripcionCargo"]').value.trim();
+            if(!cantidad || !precio) return alert('Ingresá cantidad y precio unitario.');
+            const monto = cantidad*precio;
+            state.cargosAdicionales.push({id:uid(), eventoId: ev.id, tipo, cantidad, precioUnitario:precio, monto, descripcion, fecha: todayStr(), cobrado:false, adminId: adminUnlocked.id});
+            pushLog(adminUnlocked.nombre, 'Cargo adicional agregado', `${TIPOS_CARGO_ADICIONAL[tipo]||tipo} ${fmtMoney(monto)} — ${ev.lugar||'(sin lugar)'}`);
+            saveState(); closeModal(); render();
+          });
+        }
+        modalEl.querySelectorAll('[data-cargo-cobrado]').forEach(chk=>{
+          chk.addEventListener('change', ()=>{
+            const cargo = state.cargosAdicionales.find(c=>c.id===chk.dataset.cargoCobrado);
+            if(cargo){ cargo.cobrado = chk.checked; saveState(); render(); }
+          });
+        });
       }
     },
     onSave: (form)=>{
@@ -1671,6 +1714,8 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
         horasEvento: form.horasEvento.value,
         horarioInicio: form.horarioInicio.value,
         horarioMontaje: form.horarioMontaje.value,
+        precioHoraAdicionalEvento: form.precioHoraAdicionalEvento.value,
+        precioTragoAdicionalEvento: form.precioTragoAdicionalEvento.value,
         adultos, jovenes,
         cantidadPersonas: adultos + jovenes,
         tragosConAlcohol: leerTiers(form.querySelector('#evTragosConContainer')),
@@ -1734,6 +1779,7 @@ function eventoDetailExtra(ev){
   const destilados = uniqueDestiladosDeEvento(ev);
   const cobrosDelEvento = state.cobros.filter(c=>c.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
   const consumosDelEvento = state.movimientosInsumo.filter(m=>m.eventoId===ev.id && m.tipo==='salida').sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
+  const cargosDelEvento = state.cargosAdicionales.filter(c=>c.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
   return `
     <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
       <h3 style="font-size:0.95rem; margin:0 0 8px;">Resumen financiero</h3>
@@ -1784,6 +1830,36 @@ function eventoDetailExtra(ev){
         <div class="field" style="margin-bottom:0;"><label>Nota</label><input type="text" name="descripcion" placeholder="Opcional"></div>
       </div>
       <button type="button" class="btn small" id="btnAgregarCobro" style="margin-top:8px;">+ Registrar cobro</button>
+    </div>
+
+    <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
+      <h3 style="font-size:0.95rem; margin:0 0 8px;">Cargos adicionales al cliente</h3>
+      <div class="section-hint" style="margin-top:-4px;">Hora extra, trago extra o averías (copas, vasos, cerámicos) aprobadas o descubiertas durante/después del evento — se suman al saldo pendiente de este evento aunque ya esté marcado como "pagado en su totalidad".</div>
+      ${cargosDelEvento.length>0 ? `
+      <div class="list-simple" style="margin:10px 0;">
+        ${cargosDelEvento.map(c=>`
+          <div class="li">
+            <div><div class="t">${TIPOS_CARGO_ADICIONAL[c.tipo]||c.tipo}${c.descripcion?' — '+c.descripcion:''} ${c.cobrado?'<span class="badge pagado">cobrado</span>':'<span class="badge senado">pendiente</span>'}</div><div class="d">${fmtDate(c.fecha)}</div></div>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <div class="mono">${fmtMoney(c.monto)}</div>
+              <label style="display:flex; align-items:center; gap:4px; font-size:0.78rem; cursor:pointer;"><input type="checkbox" data-cargo-cobrado="${c.id}" ${c.cobrado?'checked':''}> cobrado</label>
+            </div>
+          </div>
+        `).join('')}
+      </div>` : '<div class="d" style="margin:10px 0;">Sin cargos adicionales todavía.</div>'}
+      <div class="field-row" id="cargoAdicionalForm" style="align-items:flex-end;">
+        <div class="field" style="margin-bottom:0;"><label>Tipo</label>
+          <select name="tipoCargo" id="tipoCargoAdicional">
+            <option value="horaAdicional">Hora adicional</option>
+            <option value="tragoAdicional">Trago adicional</option>
+            <option value="averia">Avería / pérdida (copa, vaso, cerámico…)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;"><label>Cantidad</label><input type="number" name="cantidadCargo" value="1"></div>
+        <div class="field" style="margin-bottom:0;"><label>Precio unitario</label><input type="number" name="precioCargo" id="precioCargoAdicional" value="${ev.precioHoraAdicionalEvento || (state.presupuestoConfig&&state.presupuestoConfig.precioHoraAdicional) || 0}"></div>
+        <div class="field" style="margin-bottom:0;"><label>Detalle (opcional)</label><input type="text" name="descripcionCargo" placeholder="Ej: 2 copas rotas"></div>
+      </div>
+      <button type="button" class="btn small" id="btnAgregarCargoAdicional" style="margin-top:8px;">+ Agregar cargo adicional</button>
     </div>
 
     ${destilados.length>0 ? `
@@ -4012,6 +4088,7 @@ function bindPanelEvents(){
       insumos: state.insumos, movimientosInsumo: state.movimientosInsumo,
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
+      cargosAdicionales: state.cargosAdicionales,
     }, null, 2);
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -4049,6 +4126,7 @@ function bindPanelEvents(){
         state.tiposEvento = parsed.tiposEvento || [];
         state.gastosPersonal = parsed.gastosPersonal || [];
         state.colaboradoresLimitados = parsed.colaboradoresLimitados || [];
+        state.cargosAdicionales = parsed.cargosAdicionales || [];
         if(parsed.admins && parsed.admins.length) state.admins = parsed.admins;
         if(parsed.log && parsed.log.length) state.log = parsed.log;
         pushLog(adminUnlocked.nombre, 'Importó copia de seguridad completa', file.name);
