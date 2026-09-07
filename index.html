@@ -827,6 +827,7 @@ function pushLog(actor, accion, detalle){
 const HORA_ADICIONAL_STAFF_PRECIO = 50000;
 const TIPOS_CARGO_ADICIONAL = { horaAdicional:'Hora adicional', tragoAdicional:'Trago adicional', averia:'Avería / pérdida' };
 const AVERIA_PRECIO_DEFAULT = 50000;
+const CIUDADES_PARAGUAY = ["Asunción", "25 de Diciembre", "3 de Febrero", "3 de Mayo", "Abaí", "Acahay", "Alberdi", "Alto Verá", "Altos", "Antequera", "Areguá", "Arroyito", "Arroyos y Esteros", "Atyrá", "Ayolas", "Azote'y", "Bahía Negra", "Bella Vista", "Bella Vista Norte", "Belén", "Benjamín Aceval", "Boquerón", "Borja", "Buena Vista", "Caacupé", "Caaguazú", "Caapucú", "Caazapá", "Cambyretá", "Campo Aceval", "Capiatá", "Capiibary", "Capitán Bado", "Capitán Mauricio José Troche", "Capitán Meza", "Capitán Miranda", "Caraguatay", "Carapeguá", "Carayaó", "Carlos Antonio López", "Carmelo Peralta", "Carmen del Paraná", "Cerrito", "Cerro Corá", "Choré", "Ciudad del Este", "Concepción", "Coronel Bogado", "Coronel Martínez", "Coronel Oviedo", "Corpus Christi", "Curuguaty", "Desmochados", "Domingo Martínez de Irala", "Dr. Bottrell", "Dr. Cecilio Báez", "Dr. J. Eulogio Estigarribia", "Dr. Juan León Mallorquín", "Dr. Juan Manuel Frutos", "Dr. Moisés S. Bertoni", "Dr. Raúl Peña", "Edelira", "Emboscada", "Encarnación", "Escobar", "Eusebio Ayala", "Fernando de la Mora", "Filadelfia", "Fram", "Francisco Caballero Álvarez", "Fuerte Olimpo", "Félix Pérez Cardozo", "General Artigas", "General Bernardino Caballero", "General Delgado", "General Elizardo Aquino", "General Francisco Isidoro Resquín", "General Higinio Morínigo", "General José Eduvigis Díaz", "General José María Bruguez", "Gral. Eugenio A. Garay", "Guajayvi", "Guarambaré", "Guazú-Cuá", "Hernandarias", "Hohenau", "Horqueta", "Humaitá", "Independencia", "Iruña", "Isla Pucú", "Isla Umbú", "Itacurubí de la Cordillera", "Itacurubí del Rosario", "Itakyry", "Itanará", "Itapé", "Itapúa Poty", "Itauguá", "Iturbe", "Itá", "J. Augusto Saldívar", "Jesús", "José Domingo Ocampos", "José Falcón", "José Fassardi", "José Leandro Oviedo", "Juan E. O'Leary", "Juan de Mena", "Karapaí", "Katueté", "La Colmena", "La Paloma del Espíritu Santo", "La Pastora", "La Paz", "Lambaré", "Laurel", "Laureles", "Liberación", "Lima", "Limpio", "Loma Grande", "Loma Plata", "Loreto", "Los Cedrales", "Luque", "Maciel", "Maracaná", "Mariano Roque Alonso", "Mariscal Francisco Solano López", "Mariscal José Félix Estigarribia", "María Antonia", "Mayor Martínez", "Mayor Otaño", "Mbaracayú", "Mbocayaty", "Mbocayaty del Yhaguy", "Mbuyapey", "Minga Guazú", "Minga Porá", "Nanawa", "Naranjal", "Natalicio Talavera", "Natalio", "Nueva Alborada", "Nueva Asunción", "Nueva Colombia", "Nueva Esperanza", "Nueva Germania", "Nueva Italia", "Nueva Londres", "Nueva Toledo", "Obligado", "Paraguarí", "Paso Barreto", "Paso Horqueta", "Paso Yobai", "Paso de Patria", "Pedro Juan Caballero", "Pilar", "Pirapó", "Pirayú", "Piribebuy", "Presidente Franco", "Primero de Marzo", "Puerto Adela", "Puerto Casado", "Puerto Pinasco", "Quiindy", "Quyquyhó", "R.I.3 Corrales", "Raúl Arsenio Oviedo", "Repatriación", "Salto del Guairá", "San Alberto", "San Alfredo", "San Antonio", "San Bernardino", "San Carlos", "San Cosme y Damián", "San Cristóbal", "San Estanislao", "San Ignacio", "San Joaquín", "San José Obrero", "San José de los Arroyos", "San José del Rosario", "San Juan Bautista de las Misiones", "San Juan Bautista de Ñeembucú", "San Juan Nepomuceno", "San Juan del Paraná", "San Lorenzo", "San Lázaro", "San Miguel", "San Pablo", "San Patricio", "San Pedro del Paraná", "San Pedro del Ycuamandyyú", "San Rafael del Paraná", "San Roque González", "San Salvador", "San Vicente Pancholo", "Santa Elena", "Santa Fe del Paraná", "Santa María", "Santa Rita", "Santa Rosa", "Santa Rosa del Aguaray", "Santa Rosa del Mbutuy", "Santa Rosa del Monday", "Santiago", "Sapucái", "Sargento José Félix López", "Simón Bolívar", "Tacuaras", "Tacuatí", "Tavapy", "Tavaí", "Tebicuary", "Tebicuary-Mí", "Tembiaporá", "Teniente 1° Manuel Irala Fernández", "Teniente Esteban Martínez", "Tobatí", "Tomás Romero Pereira", "Trinidad", "Unión", "Valenzuela", "Vaquería", "Villa Elisa", "Villa Florida", "Villa Franca", "Villa Hayes", "Villa Oliva", "Villa Ygatimí", "Villa del Rosario", "Villalbín", "Villarrica", "Villeta", "Yabebyry", "Yaguarón", "Yasy Cañy", "Yataity", "Yataity del Norte", "Yatytay", "Yby Pytá", "Yby Yaú", "Ybycuí", "Ybyrarobaná", "Ybytymí", "Yegros", "Yguazú", "Yhú", "Ypacaraí", "Ypané", "Ypejhú", "Yrybucuá", "Yuty", "Zanja Pytá", "Ñacunday", "Ñemby", "Ñumí"];
 function tragoAdicionalPrecio(bartenders){
   bartenders = Number(bartenders) || 1;
   if(bartenders<=1) return 2000;
@@ -2112,9 +2113,9 @@ function renderPresupuestos(){
       ${rows.map(p=>`
         <tr>
           <td>${new Date(p.fechaCreacion).toLocaleDateString('es-PY')}</td>
-          <td>${p.cliente||'—'}</td>
+          <td>${p.nombreEvento||p.cliente||'—'}</td>
           <td>${fmtDate(p.fecha)}</td>
-          <td>${p.lugar||'—'}</td>
+          <td>${p.ciudad?p.ciudad+' — ':''}${p.lugar||'—'}</td>
           <td><button class="btn small ghost" data-ver-presupuesto="${p.id}">Ver / Imprimir</button></td>
         </tr>
       `).join('')}
@@ -2186,12 +2187,18 @@ function presupuestoFormFields(){
         ${state.eventos.map(e=>`<option value="${e.id}">${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}
       </select>
     </div>
-    <div class="field"><label>Cliente / nombre del evento</label><input type="text" name="cliente" placeholder="Ej: XV años Valeska Giménez"></div>
+    <div class="field"><label>Nombre del evento</label><input type="text" name="nombreEvento" placeholder="Ej: XV años de Valeska"></div>
+    <div class="field"><label>Cliente</label><input type="text" name="cliente" placeholder="Ej: Familia Giménez"></div>
     <div class="field-row">
       <div class="field"><label>Fecha del evento</label><input type="date" name="fecha"></div>
       <div class="field"><label>Horario</label><input type="text" name="horario" placeholder="Ej: a confirmar, 20:00hs…"></div>
     </div>
-    <div class="field"><label>Lugar</label><input type="text" name="lugar"></div>
+    <div class="field-row">
+      <div class="field"><label>Ciudad</label>
+        <select name="ciudad">${CIUDADES_PARAGUAY.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>Lugar / salón</label><input type="text" name="lugar" placeholder="Nombre del salón o dirección"></div>
+    </div>
     <div class="field-row">
       <div class="field"><label>Horas de servicio</label><input type="number" name="horas" value="${cfg.horasBaseIncluidas}"></div>
       <div class="field"><label>Zona</label>
@@ -2207,9 +2214,14 @@ function presupuestoFormFields(){
     </div>
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Barra libre</label>
+    <div class="section-hint" style="margin-top:-4px;">El precio por persona varía según el lugar y la cantidad — editalo libremente para este presupuesto.</div>
     <div class="field-row">
       <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes" value="0"></div>
+      <div class="field"><label>Precio por joven</label><input type="number" name="precioPersonaJoven" value="${cfg.precioPersonaJoven}"></div>
+    </div>
+    <div class="field-row">
       <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos" value="0"></div>
+      <div class="field"><label>Precio por adulto</label><input type="number" name="precioPersonaAdulto" value="${cfg.precioPersonaAdulto}"></div>
     </div>
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Opciones de tragos con alcohol (1 a 3)</label>
@@ -2310,11 +2322,14 @@ function openPresupuestoModal(){
       const p = {
         id: uid(), fechaCreacion: Date.now(), adminId: adminUnlocked.id,
         eventoId: (document.getElementById('pEvento')||{}).value || null,
-        cliente: form.cliente.value.trim(), fecha: form.fecha.value, horario: form.horario.value.trim(), lugar: form.lugar.value.trim(),
+        nombreEvento: form.nombreEvento.value.trim(),
+        cliente: form.cliente.value.trim(), fecha: form.fecha.value, horario: form.horario.value.trim(),
+        ciudad: form.ciudad.value, lugar: form.lugar.value.trim(),
         horas: Number(form.horas.value)||cfg.horasBaseIncluidas,
         zonaNombre: zona.nombre, zonaAjuste: zona.ajuste,
         jovenes: Number(form.jovenes.value)||0, adultos: Number(form.adultos.value)||0,
-        precioPersonaJoven: cfg.precioPersonaJoven, precioPersonaAdulto: cfg.precioPersonaAdulto,
+        precioPersonaJoven: Number(form.precioPersonaJoven.value)||cfg.precioPersonaJoven,
+        precioPersonaAdulto: Number(form.precioPersonaAdulto.value)||cfg.precioPersonaAdulto,
         horasBaseIncluidas: cfg.horasBaseIncluidas, precioHoraAdicional: Number(form.precioHoraAdicional.value)||cfg.precioHoraAdicional,
         precioTragoConAlcohol: Number(form.precioTragoConAlcoholRef.value)||cfg.precioTragoConAlcohol,
         precioTragoSinAlcohol: Number(form.precioTragoSinAlcoholRef.value)||cfg.precioTragoSinAlcohol,
@@ -2361,8 +2376,10 @@ function renderPresupuestoPrint(p){
         <div style="color:#666; font-size:0.85rem;">Asunción, ${new Date().toLocaleDateString('es-PY',{day:'numeric', month:'long', year:'numeric'})}</div>
         <h2 style="margin:6px 0 18px; color:${VERDE}; font-family:'Fraunces',Georgia,serif;">PRESUPUESTO DE SERVICIO</h2>
         <div style="font-size:0.9rem; line-height:1.7; margin-bottom:18px;">
-          <div><b>Evento:</b> ${p.cliente||'—'}</div>
+          <div><b>Evento:</b> ${p.nombreEvento||p.cliente||'—'}</div>
+          ${p.cliente ? `<div><b>Cliente:</b> ${p.cliente}</div>` : ''}
           <div><b>Fecha:</b> ${fmtDate(p.fecha)}</div>
+          <div><b>Ciudad:</b> ${p.ciudad||'—'}</div>
           <div><b>Lugar:</b> ${p.lugar||'—'}</div>
           <div><b>Horario:</b> ${p.horario||'a confirmar'}</div>
           ${p.zonaAjuste ? `<div><b>Zona:</b> ${p.zonaNombre} (+${fmtMoney(p.zonaAjuste)})</div>` : ''}
@@ -2425,7 +2442,7 @@ function renderPresupuestoPrint(p){
     </div>
   `;
 
-  const nombreArchivo = `presupuesto-${(p.cliente||'blend').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.pdf`;
+  const nombreArchivo = `presupuesto-${(p.nombreEvento||p.cliente||'blend').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.pdf`;
   const estadoEl = document.getElementById('presupuestoPdfEstado');
 
   function construirPresupuestoPDF(){
@@ -2513,8 +2530,10 @@ function renderPresupuestoPrint(p){
 
     titulo('PRESUPUESTO DE SERVICIO', 14);
     espacio(4);
-    linea(`Evento: ${p.cliente||'—'}`);
+    linea(`Evento: ${p.nombreEvento||p.cliente||'—'}`);
+    if(p.cliente) linea(`Cliente: ${p.cliente}`);
     linea(`Fecha: ${fmtDate(p.fecha)}`);
+    linea(`Ciudad: ${p.ciudad||'—'}`);
     linea(`Lugar: ${p.lugar||'—'}`);
     linea(`Horario: ${p.horario||'a confirmar'}`);
     if(p.zonaAjuste) linea(`Zona: ${p.zonaNombre} (+${fmtMoney(p.zonaAjuste)})`);
