@@ -773,7 +773,7 @@ function migrarProduccionAntigua(){
         nuevos.push({
           id: uid(), fecha: r.fecha, personaId: pid, funcion: r.tipo || 'Otro',
           descripcion: r.descripcion || '', tarifaBase: r.costo || 0,
-          extensionTipo: 'ninguna', extensionMonto: 0, extensionDescripcion: '',
+          extensionTipo: 'ninguna', extensionMonto: 0, extensionDescripcion: '', pagado: true,
         });
       });
     } else {
@@ -3000,6 +3000,7 @@ function openProduccionModal(id){
         horasExtra: Number(form.horasExtra.value)||0,
         tragosExtraCantidad: Number(form.tragosExtraCantidad.value)||0,
         tragosExtraBartenders: Number(form.tragosExtraBartenders.value)||1,
+        pagado: r ? r.pagado : true,
       };
       const perNombre = (personaDe(data.personaId)||{}).nombre || '';
       if(r){ Object.assign(r, data); pushLog(adminUnlocked.nombre, 'Día trabajado editado', `${perNombre} — ${data.funcion} — ${fmtDate(data.fecha)}`); }
@@ -3128,7 +3129,7 @@ function openImportProduccionModal(){
           id: uid(), personaId: parsedPersonaId, funcion: e.funcion, fecha: e.fecha,
           fueraAsuncion: e.fueraAsuncion, descripcion: e.descripcion,
           tarifaBase: tarifaPara(persona, e.funcion, e.fueraAsuncion),
-          extensionTipo: 'ninguna', extensionMonto: 0, extensionDescripcion: '',
+          extensionTipo: 'ninguna', extensionMonto: 0, extensionDescripcion: '', pagado: true,
           horasExtra: e.horasExtra||0, tragosExtraCantidad: e.tragosExtra||0, tragosExtraBartenders: e.bartenders||1,
         });
         count++;
@@ -3468,6 +3469,38 @@ function openCajaModal(id){
 function renderPagos(){
   const rows = [...state.pagos].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   return `
+    ${(()=>{
+      const map = {};
+      function ensure(pid){ if(!map[pid]) map[pid] = {dias:0, diasMonto:0, gastos:0, gastosMonto:0}; return map[pid]; }
+      state.produccion.filter(r=>!r.pagado).forEach(r=>{ const m = ensure(r.personaId); m.dias++; m.diasMonto += totalRegistro(r); });
+      state.gastosPersonal.filter(g=>!g.pagado).forEach(g=>{ const m = ensure(g.personaId); m.gastos++; m.gastosMonto += Number(g.monto)||0; });
+      const personaIds = Object.keys(map);
+      if(personaIds.length===0) return '';
+      return `
+      <div class="card" style="margin-bottom:20px;">
+        <h3 style="margin-top:0; font-size:0.95rem;">Pendiente por persona</h3>
+        <div class="section-hint" style="margin-top:-6px;">Todo lo que le debés a cada uno — días trabajados y gastos a reembolsar juntos.</div>
+        <div class="list-simple" style="margin-top:10px;">
+          ${personaIds.map(pid=>{
+            const per = personaDe(pid);
+            const m = map[pid];
+            const total = m.diasMonto + m.gastosMonto;
+            const partes = [];
+            if(m.dias>0) partes.push(`${m.dias} día(s)`);
+            if(m.gastos>0) partes.push(`${m.gastos} gasto(s)`);
+            return `
+            <div class="li">
+              <div><div class="t">${per?per.nombre:'(persona eliminada)'}</div><div class="d">${partes.join(' · ')}</div></div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div class="mono" style="color:var(--gold);">${fmtMoney(total)}</div>
+                <button class="btn small" data-generar-pago-total="${pid}" ${!per?'disabled':''}>Generar pago</button>
+              </div>
+            </div>
+          `;}).join('')}
+        </div>
+      </div>`;
+    })()}
+
     <div class="row-between">
       <div><h2 class="section-title">Pagos de Personal</h2><div class="section-hint">Logística, bartenders, bacheras — por evento o generales. Sale de la caja que elijas.</div></div>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -3513,6 +3546,33 @@ function renderPagos(){
         `;}).join('')}
       </div>
     </div>` : ''}
+
+    ${(()=>{
+      const porPersona = {};
+      state.produccion.filter(r=>!r.pagado).forEach(r=>{ (porPersona[r.personaId] = porPersona[r.personaId]||[]).push(r); });
+      const personaIds = Object.keys(porPersona);
+      if(personaIds.length===0) return '';
+      return `
+      <div class="card" style="margin-top:20px;">
+        <h3 style="margin-top:0; font-size:0.95rem;">Días trabajados pendientes de pago</h3>
+        <div class="section-hint" style="margin-top:-6px;">Días registrados (por ejemplo, desde un reporte marcado "dejar pendiente") que todavía no se pagaron.</div>
+        <div class="list-simple" style="margin-top:10px;">
+          ${personaIds.map(pid=>{
+            const per = personaDe(pid);
+            const regs = porPersona[pid];
+            const total = regs.reduce((s,r)=>s+totalRegistro(r),0);
+            return `
+            <div class="li">
+              <div><div class="t">${per?per.nombre:'(persona eliminada)'} — ${regs.length} día(s)</div><div class="d">${regs.map(r=>fmtDate(r.fecha)).join(', ')}</div></div>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div class="mono">${fmtMoney(total)}</div>
+                <button class="btn small" data-generar-pago-dias="${pid}" ${!per?'disabled':''}>Generar pago</button>
+              </div>
+            </div>
+          `;}).join('')}
+        </div>
+      </div>`;
+    })()}
   `;
 }
 function pagoFormFields(p){
@@ -3561,6 +3621,74 @@ function openPagoModal(id){
   render();
 }
 
+function openGenerarPagoTotalModal(personaId){
+  const persona = personaDe(personaId);
+  const diasPend = state.produccion.filter(r=>r.personaId===personaId && !r.pagado);
+  const gastosPend = state.gastosPersonal.filter(g=>g.personaId===personaId && !g.pagado);
+  const totalDias = diasPend.reduce((s,r)=>s+totalRegistro(r),0);
+  const totalGastos = gastosPend.reduce((s,g)=>s+(Number(g.monto)||0),0);
+  const total = totalDias + totalGastos;
+  if(total<=0) return;
+  modalContent = {
+    title: 'Generar pago pendiente',
+    bodyHtml: `
+      <div class="section-hint">
+        Persona: <b>${persona?persona.nombre:'—'}</b><br>
+        ${diasPend.length>0 ? `${diasPend.length} día(s) trabajado(s): ${fmtMoney(totalDias)}<br>` : ''}
+        ${gastosPend.length>0 ? `${gastosPend.length} gasto(s) a reembolsar: ${fmtMoney(totalGastos)}<br>` : ''}
+        <b>Total: ${fmtMoney(total)}</b>
+      </div>
+      <div class="field" style="margin-top:14px;"><label>Fecha del pago</label><input type="date" name="fechaPago" value="${todayStr()}"></div>
+      <div class="field"><label>Caja de donde sale</label>
+        <select name="cajaIdPago">${state.cajas.map(cc=>`<option value="${cc.id}" ${cc.administradorId===(adminUnlocked&&adminUnlocked.id)?'selected':''}>${cc.nombre}</option>`).join('')}</select>
+      </div>
+    `,
+    customSubmitLabel: 'Generar pago',
+    onSave: (form)=>{
+      const detalles = [];
+      if(diasPend.length>0) detalles.push(`${diasPend.length} día(s) trabajado(s)`);
+      if(gastosPend.length>0) detalles.push(`${gastosPend.length} gasto(s) reembolsados`);
+      state.pagos.push({
+        id: uid(), personaId, eventoId: null, fecha: form.fechaPago.value || todayStr(),
+        monto: total, descripcion: `Pago pendiente (${detalles.join(' + ')})`,
+        cajaId: form.cajaIdPago.value, adminId: adminUnlocked.id,
+      });
+      diasPend.forEach(r=>{ r.pagado = true; });
+      gastosPend.forEach(g=>{ g.pagado = true; });
+      pushLog(adminUnlocked.nombre, 'Pago pendiente generado', `${fmtMoney(total)} — ${persona?persona.nombre:''}`);
+      saveState(); closeModal(); render();
+    },
+  };
+  render();
+}
+function openGenerarPagoDiasModal(personaId){
+  const persona = personaDe(personaId);
+  const regs = state.produccion.filter(r=>r.personaId===personaId && !r.pagado);
+  if(regs.length===0) return;
+  const total = regs.reduce((s,r)=>s+totalRegistro(r),0);
+  modalContent = {
+    title: 'Generar pago de días trabajados',
+    bodyHtml: `
+      <div class="section-hint">Persona: <b>${persona?persona.nombre:'—'}</b><br>${regs.length} día(s): ${regs.map(r=>fmtDate(r.fecha)).join(', ')}<br>Total: ${fmtMoney(total)}</div>
+      <div class="field" style="margin-top:14px;"><label>Fecha del pago</label><input type="date" name="fechaPago" value="${todayStr()}"></div>
+      <div class="field"><label>Caja de donde sale</label>
+        <select name="cajaIdPago">${state.cajas.map(cc=>`<option value="${cc.id}" ${cc.administradorId===(adminUnlocked&&adminUnlocked.id)?'selected':''}>${cc.nombre}</option>`).join('')}</select>
+      </div>
+    `,
+    customSubmitLabel: 'Generar pago',
+    onSave: (form)=>{
+      state.pagos.push({
+        id: uid(), personaId, eventoId: null, fecha: form.fechaPago.value || todayStr(),
+        monto: total, descripcion: `Pago de días trabajados (${regs.map(r=>fmtDate(r.fecha)).join(', ')})`,
+        cajaId: form.cajaIdPago.value, adminId: adminUnlocked.id,
+      });
+      regs.forEach(r=>{ r.pagado = true; });
+      pushLog(adminUnlocked.nombre, 'Pago de días trabajados generado', `${fmtMoney(total)} — ${persona?persona.nombre:''}`);
+      saveState(); closeModal(); render();
+    },
+  };
+  render();
+}
 function openGenerarPagoGastoModal(gastoId){
   const g = state.gastosPersonal.find(x=>x.id===gastoId);
   if(!g) return;
@@ -4116,6 +4244,8 @@ function bindPanelEvents(){
   const btnImportarPago = document.getElementById('btnImportarPago');
   if(btnImportarPago) btnImportarPago.addEventListener('click', ()=>openImportPagoModal());
   panel.querySelectorAll('[data-generar-pago-gasto]').forEach(b=>b.addEventListener('click', ()=>openGenerarPagoGastoModal(b.dataset.generarPagoGasto)));
+  panel.querySelectorAll('[data-generar-pago-dias]').forEach(b=>b.addEventListener('click', ()=>openGenerarPagoDiasModal(b.dataset.generarPagoDias)));
+  panel.querySelectorAll('[data-generar-pago-total]').forEach(b=>b.addEventListener('click', ()=>openGenerarPagoTotalModal(b.dataset.generarPagoTotal)));
 
   const btnNuevoAdmin = document.getElementById('btnNuevoAdmin');
   if(btnNuevoAdmin) btnNuevoAdmin.addEventListener('click', ()=>openAdminModal(null));
