@@ -700,6 +700,15 @@ function fmtDate(d){
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
 function waLink(texto){ return 'https://wa.me/?text=' + encodeURIComponent(texto); }
+function comprobantePagoTexto(pago){
+  const per = personaDe(pago.personaId);
+  let txt = `🧾 BLEND — Comprobante de pago\n`;
+  txt += `Para: ${per?per.nombre:'—'}\n`;
+  txt += `Fecha: ${fmtDate(pago.fecha)}\n`;
+  if(pago.descripcion) txt += `Detalle: ${pago.descripcion}\n`;
+  txt += `Monto: ${fmtMoney(pago.monto)}\n`;
+  return txt;
+}
 function waRecordatorioEvento(ev){
   let txt = `📅 Recordatorio de evento\n`;
   txt += `Lugar: ${ev.lugar||'(sin lugar)'}\n`;
@@ -2891,7 +2900,7 @@ function renderProduccion(){
     ${state.personal.length===0 ? '<div class="empty">Cargá personal en "Equipo" primero.</div>' : (rows.length===0 ? '<div class="empty">No hay registros todavía.</div>' : `
     <div class="card" style="padding:0;">
     <table>
-      <thead><tr><th>Fecha</th><th>Persona</th><th>Función</th><th>Descripción</th><th>Tarifa base</th><th>Extras</th><th>Total</th><th></th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Persona</th><th>Función</th><th>Descripción</th><th>Tarifa base</th><th>Extras</th><th>Total</th><th>Estado</th><th></th></tr></thead>
       <tbody>
       ${rows.map(r=>{ const per = personaDe(r.personaId); const ext = r.extensionTipo && r.extensionTipo!=='ninguna';
         const horasExtraMonto = (Number(r.horasExtra)||0) * HORA_ADICIONAL_STAFF_PRECIO;
@@ -2910,6 +2919,7 @@ function renderProduccion(){
             ${(!ext && !r.horasExtra && !r.tragosExtraCantidad) ? '—' : ''}
           </td>
           <td class="mono" style="color:var(--sage);">${fmtMoney(totalRegistro(r))}</td>
+          <td>${r.pagado ? '<span class="badge pagado">Pagado</span>' : '<span class="badge senado">Pendiente</span>'}</td>
           <td><button class="btn small ghost" data-open-produccion="${r.id}">Editar</button></td>
         </tr>
       `;}).join('')}
@@ -3523,7 +3533,7 @@ function renderPagos(){
           <td>${p.descripcion||'—'}</td>
           <td style="color:var(--cream-dim);">${adminP?adminP.nombre:'—'}</td>
           <td class="mono">${fmtMoney(p.monto)}</td>
-          <td><button class="btn small ghost" data-open-pago="${p.id}">Editar</button></td>
+          <td><div style="display:flex; gap:6px;"><button class="btn small ghost" data-open-pago="${p.id}">Editar</button><button class="btn small ghost" data-compartir-pago="${p.id}">Compartir</button></div></td>
         </tr>
       `;}).join('')}
       </tbody>
@@ -4241,6 +4251,10 @@ function bindPanelEvents(){
   const btnNuevoPago = document.getElementById('btnNuevoPago');
   if(btnNuevoPago) btnNuevoPago.addEventListener('click', ()=>openPagoModal(null));
   panel.querySelectorAll('[data-open-pago]').forEach(b=>b.addEventListener('click', ()=>openPagoModal(b.dataset.openPago)));
+  panel.querySelectorAll('[data-compartir-pago]').forEach(b=>b.addEventListener('click', ()=>{
+    const pago = state.pagos.find(x=>x.id===b.dataset.compartirPago);
+    if(pago) window.open(waLink(comprobantePagoTexto(pago)), '_blank');
+  }));
   const btnImportarPago = document.getElementById('btnImportarPago');
   if(btnImportarPago) btnImportarPago.addEventListener('click', ()=>openImportPagoModal());
   panel.querySelectorAll('[data-generar-pago-gasto]').forEach(b=>b.addEventListener('click', ()=>openGenerarPagoGastoModal(b.dataset.generarPagoGasto)));
