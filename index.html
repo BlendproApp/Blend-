@@ -1228,8 +1228,8 @@ function renderCalendario(){
         </div>
         <div class="stat">
           <div class="k">Pendiente de cobro</div>
-          <div class="v" style="color:var(--gold); font-size:1.2rem;">${fmtMoney(state.eventos.reduce((s,ev)=>s+Math.max(0, saldoPendienteEvento(ev)), 0))}</div>
-          <div style="font-size:0.72rem; color:var(--cream-dim); margin-top:4px;">Montos de eventos sin cobrar o cobrados parcialmente</div>
+          <div class="v" style="color:var(--gold); font-size:1.2rem;">${fmtMoney(state.eventos.filter(ev=>ev.estado==='reservado').reduce((s,ev)=>s+Math.max(0, saldoPendienteEvento(ev)), 0))}</div>
+          <div style="font-size:0.72rem; color:var(--cream-dim); margin-top:4px;">Montos de eventos reservados sin cobrar o cobrados parcialmente (no incluye posibles)</div>
         </div>
       </div>
     </div>` : ''}
