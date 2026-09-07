@@ -2336,6 +2336,23 @@ function openPresupuestoModal(){
         tragosConAlcohol, tragosSinAlcohol,
         incluye: [...cfg.incluye], observaciones: [...cfg.observaciones],
       };
+      if(!p.eventoId){
+        const lugarCompleto = [p.ciudad, p.lugar].filter(Boolean).join(' — ');
+        const nuevoEvento = {
+          id: uid(), estado: 'posible', fecha: p.fecha, lugar: lugarCompleto,
+          tipoEvento: '', horasEvento: p.horas, horarioInicio: '', horarioMontaje: '',
+          precioHoraAdicionalEvento: p.precioHoraAdicional, precioTragoAdicionalEvento: p.precioTragoConAlcohol,
+          adultos: p.adultos, jovenes: p.jovenes, cantidadPersonas: p.adultos + p.jovenes,
+          tragosConAlcohol: p.tragosConAlcohol, tragosSinAlcohol: p.tragosSinAlcohol,
+          tragos: '', tragosIds: [], personalAsignado: [],
+          observaciones: `Generado automáticamente desde un presupuesto${p.nombreEvento?': '+p.nombreEvento:''}${p.cliente?' — '+p.cliente:''}`,
+          montoTotal: '', senaPercent: '', pagadoTotal: false, planner: '', comisionPlannerPercent: '',
+          degustacionFecha: '', reunionPlannerFecha: '',
+        };
+        state.eventos.push(nuevoEvento);
+        p.eventoId = nuevoEvento.id;
+        pushLog(adminUnlocked.nombre, 'Evento posible creado desde presupuesto', `${lugarCompleto||'(sin lugar)'} — ${fmtDate(p.fecha)}`);
+      }
       state.presupuestos.push(p);
       pushLog(adminUnlocked.nombre, 'Presupuesto generado', `${p.cliente||'(sin nombre)'} — ${fmtDate(p.fecha)}`);
       saveState(); closeModal();
