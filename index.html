@@ -478,9 +478,36 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   }
   nav.tabs button:hover{ color:var(--cream); }
   nav.tabs button.active{ color:var(--copper-bright); border-bottom-color:var(--copper); }
+
+  nav.secciones-nav{
+    display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:20px 0 4px; padding-bottom:2px;
+  }
+  nav.secciones-nav::-webkit-scrollbar{ display:none; }
+  nav.secciones-nav button{
+    background:var(--ink-2); border:1px solid var(--line); color:var(--cream-dim);
+    font-family:'Work Sans', sans-serif; font-size:0.86rem; font-weight:600;
+    padding:10px 16px; border-radius:11px; cursor:pointer; white-space:nowrap; flex-shrink:0;
+    transition:all .15s ease; display:flex; align-items:center; gap:7px;
+  }
+  nav.secciones-nav button .ico{ font-size:0.95rem; }
+  nav.secciones-nav button:hover{ color:var(--cream); border-color:var(--copper-dim,var(--copper)); }
+  nav.secciones-nav button.active{ background:var(--copper); border-color:var(--copper); color:#181008; }
+
+  nav.sub-tabs{ display:flex; flex-wrap:wrap; gap:4px; margin:14px 0 24px; border-bottom:1px solid var(--line); padding-bottom:0; }
+  nav.sub-tabs button{
+    background:none; border:none; color:var(--cream-dim);
+    font-family:'Work Sans', sans-serif; font-size:0.84rem; font-weight:500;
+    padding:9px 12px; cursor:pointer; white-space:nowrap;
+    border-bottom:2px solid transparent; transition:all .15s ease;
+  }
+  nav.sub-tabs button:hover{ color:var(--cream); }
+  nav.sub-tabs button.active{ color:var(--copper-bright); border-bottom-color:var(--copper); }
+
   @media(max-width:640px){
     nav.tabs button{ padding:8px 9px; font-size:0.78rem; }
     .tab-grupo-label{ width:52px; font-size:0.58rem; }
+    nav.secciones-nav button{ padding:8px 12px; font-size:0.8rem; }
+    nav.sub-tabs button{ padding:7px 9px; font-size:0.76rem; }
   }
 
   .panel{ animation:fade .25s ease; }
@@ -661,10 +688,11 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 const ROLES = ['Bartender','Bachera','Logística','Producción','Limpieza','Otro'];
+function todosLosRoles(){ return ROLES.concat(state.rolesExtra||[]); }
 const TIPOS_TRABAJO = ['Logística','Limpieza','Producción'];
 const ACCIONES_LOG_LIMITE = 500;
 
-let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [] };
+let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [] };
 let colaboradorLimitadoUnlocked = null;
 let currentTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
 function toggleTheme(){
@@ -682,6 +710,7 @@ function bindThemeToggle(){
 let workerGastos = [];
 let disponibilidadFecha = null;
 let currentTab = 'calendario';
+let reportesMesFiltro = '';
 let calCursor = new Date();
 let calendarioByDay = {};
 let modalContent = null; // {title, fields render fn, onSave}
@@ -702,6 +731,27 @@ function fmtMoney(n){
   n = Number(n)||0;
   return 'Gs. ' + n.toLocaleString('es-PY', {maximumFractionDigits:0});
 }
+function parseMonto(v){
+  // acepta "23000000" o "23.000.000" (puntos como separador de miles) — nunca decimales, es guaraníes
+  if(v===null || v===undefined) return 0;
+  const limpio = String(v).trim().replace(/\./g, '').replace(/,/g, '');
+  const n = Number(limpio);
+  return isNaN(n) ? 0 : n;
+}
+document.addEventListener('input', function(e){
+  if(e.target && e.target.classList && e.target.classList.contains('input-monto')){
+    const raw = e.target.value.replace(/[^\d]/g, '');
+    e.target.value = raw ? Number(raw).toLocaleString('es-PY') : '';
+  }
+});
+function formatearInputsMonto(root){
+  (root||document).querySelectorAll('.input-monto:not([data-formateado])').forEach(el=>{
+    const raw = String(el.value||'').replace(/[^\d]/g, '');
+    el.value = raw ? Number(raw).toLocaleString('es-PY') : '';
+    el.dataset.formateado = '1';
+  });
+}
+new MutationObserver(()=>formatearInputsMonto(document)).observe(document.body, {childList:true, subtree:true});
 function fmtDate(d){
   if(!d) return '—';
   const dt = new Date(d+'T00:00:00');
@@ -771,6 +821,7 @@ async function loadState(){
       state.colaboradoresLimitados = parsed.colaboradoresLimitados || [];
       state.cargosAdicionales = parsed.cargosAdicionales || [];
       state.transferenciasCaja = parsed.transferenciasCaja || [];
+      state.rolesExtra = parsed.rolesExtra || [];
       migrarProduccionAntigua();
       migrarRecetarioNuevosTragos();
     }
@@ -829,7 +880,7 @@ async function saveState(){
       insumos: state.insumos, movimientosInsumo: state.movimientosInsumo,
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
-      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja,
+      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra,
     });
     storageOk = true;
   }catch(e){
@@ -924,6 +975,17 @@ function cargosAdicionalesPendientesEvento(eventoId){
 function saldoPendienteEvento(ev){
   const base = ev.pagadoTotal ? 0 : (Number(ev.montoTotal)||0) - cobradoEvento(ev.id);
   return base + cargosAdicionalesPendientesEvento(ev.id);
+}
+function estadoCicloEvento(ev){
+  const personalDelEvento = state.produccion.filter(r=>r.eventoId===ev.id);
+  const personalPagado = personalDelEvento.every(r=>r.pagado);
+  const tienePlanner = !!(ev.planner && Number(ev.comisionPlannerPercent)>0);
+  const comisionPagada = tienePlanner ? !!ev.comisionPagada : true;
+  const saldoCerrado = saldoPendienteEvento(ev) <= 0;
+  return {
+    cerrado: personalPagado && comisionPagada && saldoCerrado,
+    personalPagado, tienePlanner, comisionPagada, saldoCerrado,
+  };
 }
 
 function stockInsumo(insumoId){
@@ -1053,37 +1115,40 @@ function render(){
     return;
   }
 
-  const tabGrupos = [
-    { grupo: 'Operación', tabs: [
+  const secciones = [
+    { id: 'inicio', label: 'Inicio', icon: '◐', tabs: [
       ['calendario','Calendario'],
+    ]},
+    { id: 'eventos', label: 'Eventos', icon: '▤', tabs: [
       ['eventos','Eventos'],
       ['degustaciones','Degustaciones / Planners'],
       ['disponibilidad','Disponibilidad'],
+      ['presupuestos','Presupuestos'],
     ]},
-    { grupo: 'Equipo', tabs: [
+    { id: 'equipo', label: 'Equipo', icon: '◈', tabs: [
       ['equipo','Equipo'],
       ['produccion','Producción / Limpieza'],
       ['pagos','Pagos de Personal'],
     ]},
-    { grupo: 'Finanzas', tabs: [
+    { id: 'finanzas', label: 'Finanzas', icon: '◉', tabs: [
       ['compras','Compras'],
       ['gastos','Gastos e Inversiones'],
       ['cobros','Cobros'],
       ['cajas','Cajas'],
       ['reportes','Reportes'],
     ]},
-    { grupo: 'Catálogo', tabs: [
+    { id: 'catalogo', label: 'Catálogo', icon: '◇', tabs: [
       ['recetario','Recetario'],
-      ['presupuestos','Presupuestos'],
       ['insumos','Inventario'],
     ]},
-    { grupo: 'Sistema', tabs: [
+    { id: 'sistema', label: 'Sistema', icon: '⚙', tabs: [
       ['actividad','Actividad'],
       ['administradores','Administradores'],
     ]},
   ];
-  const tabs = tabGrupos.flatMap(g=>g.tabs);
+  const tabs = secciones.flatMap(s=>s.tabs);
   if(!tabs.find(t=>t[0]===currentTab)) currentTab = 'calendario';
+  const seccionActual = secciones.find(s=>s.tabs.some(t=>t[0]===currentTab));
 
   app.innerHTML = `
     <header class="top">
@@ -1098,18 +1163,24 @@ function render(){
         ${themeToggleBtnHtml()}
       </div>
     </header>
-    <nav class="tabs tabs-grouped">
-      ${tabGrupos.map(g=>`
-        <div class="tab-grupo">
-          <span class="tab-grupo-label">${g.grupo}</span>
-          <div class="tab-grupo-scroll">${g.tabs.map(([k,label])=>`<button data-tab="${k}" class="${currentTab===k?'active':''}">${label}</button>`).join('')}</div>
-        </div>
-      `).join('')}
+    <nav class="secciones-nav">
+      ${secciones.map(s=>`<button data-seccion="${s.id}" class="${seccionActual.id===s.id?'active':''}"><span class="ico">${s.icon}</span>${s.label}</button>`).join('')}
     </nav>
+    ${seccionActual.tabs.length>1 ? `
+    <nav class="tabs sub-tabs">
+      ${seccionActual.tabs.map(([k,label])=>`<button data-tab="${k}" class="${currentTab===k?'active':''}">${label}</button>`).join('')}
+    </nav>` : '<div style="height:20px;"></div>'}
     ${!storageOk ? `<div class="card tight" style="border-color:var(--red-dim); background:rgba(192,96,79,0.1); margin-bottom:16px; font-size:0.82rem;">No se pudo conectar con el guardado — los cambios que hagas ahora podrían no quedar guardados. Probá recargar la página.</div>` : ''}
     <div class="panel" id="panel"></div>
   `;
-  app.querySelectorAll('nav.tabs button').forEach(b=>{
+  app.querySelectorAll('nav.secciones-nav button').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const s = secciones.find(x=>x.id===b.dataset.seccion);
+      currentTab = s.tabs[0][0];
+      render();
+    });
+  });
+  app.querySelectorAll('nav.sub-tabs button').forEach(b=>{
     b.addEventListener('click', ()=>{ currentTab = b.dataset.tab; render(); });
   });
   const btnLoginAdmin = document.getElementById('btnLoginAdmin');
@@ -1493,8 +1564,8 @@ function eventoFormFields(ev){
       <div class="field"><label>Horario de montaje</label><input type="time" name="horarioMontaje" value="${ev.horarioMontaje||''}"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Precio hora adicional (de este evento)</label><input type="number" name="precioHoraAdicionalEvento" value="${ev.precioHoraAdicionalEvento||''}"></div>
-      <div class="field"><label>Precio trago adicional (de este evento)</label><input type="number" name="precioTragoAdicionalEvento" value="${ev.precioTragoAdicionalEvento||''}"></div>
+      <div class="field"><label>Precio hora adicional (de este evento)</label><input type="text" inputmode="decimal" class="input-monto" name="precioHoraAdicionalEvento" value="${ev.precioHoraAdicionalEvento||''}"></div>
+      <div class="field"><label>Precio trago adicional (de este evento)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoAdicionalEvento" value="${ev.precioTragoAdicionalEvento||''}"></div>
     </div>
     <div class="section-hint" style="margin:-10px 0 14px;">Se van a sugerir como precio al cargar un "Cargo adicional" para este evento en particular — cada evento puede tener valores distintos.</div>
     <div class="field-row">
@@ -1523,7 +1594,7 @@ function eventoFormFields(ev){
     <div class="field"><label>Otras notas de tragos (libre, opcional)</label><input type="text" name="tragos" value="${ev.tragos||''}" placeholder="Ej: llevar hielo extra, sin alcohol para 5 personas…"></div>
     <div class="field"><label>Observaciones</label><textarea name="observaciones">${ev.observaciones||''}</textarea></div>
     <div class="field-row">
-      <div class="field"><label>Monto total del evento</label><input type="number" name="montoTotal" value="${ev.montoTotal||''}"></div>
+      <div class="field"><label>Monto total del evento</label><input type="text" inputmode="decimal" class="input-monto" name="montoTotal" value="${ev.montoTotal||''}"></div>
       <div class="field"><label>Seña (%)</label><input type="number" name="senaPercent" value="${ev.senaPercent||''}"></div>
     </div>
     <div class="checkline"><input type="checkbox" name="pagadoTotal" id="chkPagado" ${ev.pagadoTotal?'checked':''}><label for="chkPagado">Pagado en su totalidad</label></div>
@@ -1532,6 +1603,7 @@ function eventoFormFields(ev){
       <div class="field"><label>Planner</label><input type="text" name="planner" value="${ev.planner||''}"></div>
       <div class="field"><label>Comisión planner (%)</label><input type="number" name="comisionPlannerPercent" value="${ev.comisionPlannerPercent||''}"></div>
     </div>
+    ${ev.planner ? `<div class="checkline"><input type="checkbox" name="comisionPagada" id="chkComisionPagada" ${ev.comisionPagada?'checked':''}><label for="chkComisionPagada">Comisión del planner ya pagada</label></div>` : ''}
     <div class="field-row">
       <div class="field"><label>Fecha de degustación</label><input type="date" name="degustacionFecha" value="${ev.degustacionFecha||''}"></div>
       <div class="field"><label>Fecha de reunión con planner</label><input type="date" name="reunionPlannerFecha" value="${ev.reunionPlannerFecha||''}"></div>
@@ -1728,7 +1800,7 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
             const cf = modalEl.querySelector('#cargoAdicionalForm');
             const tipo = cf.querySelector('[name="tipoCargo"]').value;
             const cantidad = Number(cf.querySelector('[name="cantidadCargo"]').value)||0;
-            const precio = Number(cf.querySelector('[name="precioCargo"]').value)||0;
+            const precio = parseMonto(cf.querySelector('[name="precioCargo"]').value);
             const descripcion = cf.querySelector('[name="descripcionCargo"]').value.trim();
             if(!cantidad || !precio) return alert('Ingresá cantidad y precio unitario.');
             const monto = cantidad*precio;
@@ -1751,7 +1823,7 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
         const tiers = [];
         container.querySelectorAll('[data-tier-block]').forEach(block=>{
           const cantidad = Number(block.querySelector('input[name$="_cantidad"]').value)||0;
-          const precio = Number(block.querySelector('input[name$="_precio"]').value)||0;
+          const precio = parseMonto(block.querySelector('input[name$="_precio"]').value);
           if(cantidad>0) tiers.push({cantidad, precio});
         });
         return tiers;
@@ -1766,8 +1838,8 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
         horasEvento: form.horasEvento.value,
         horarioInicio: form.horarioInicio.value,
         horarioMontaje: form.horarioMontaje.value,
-        precioHoraAdicionalEvento: form.precioHoraAdicionalEvento.value,
-        precioTragoAdicionalEvento: form.precioTragoAdicionalEvento.value,
+        precioHoraAdicionalEvento: parseMonto(form.precioHoraAdicionalEvento.value),
+        precioTragoAdicionalEvento: parseMonto(form.precioTragoAdicionalEvento.value),
         adultos, jovenes,
         cantidadPersonas: adultos + jovenes,
         tragosConAlcohol: leerTiers(form.querySelector('#evTragosConContainer')),
@@ -1776,11 +1848,12 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
         tragosIds: Array.from(tragosSeleccionados),
         personalAsignado: Array.from(personalSeleccionado),
         observaciones: form.observaciones.value.trim(),
-        montoTotal: form.montoTotal.value,
+        montoTotal: parseMonto(form.montoTotal.value),
         senaPercent: form.senaPercent.value,
         pagadoTotal: form.pagadoTotal.checked,
         planner: form.planner.value.trim(),
         comisionPlannerPercent: form.comisionPlannerPercent.value,
+        comisionPagada: form.comisionPagada ? form.comisionPagada.checked : (ev?ev.comisionPagada:false),
         degustacionFecha: form.degustacionFecha.value,
         reunionPlannerFecha: form.reunionPlannerFecha.value,
         fueraAsuncion: form.fueraAsuncion.checked,
@@ -1900,7 +1973,7 @@ function eventoDetailExtra(ev){
       </div>` : '<div class="d" style="margin-bottom:10px;">Sin cobros registrados todavía.</div>'}
       <div class="field-row" id="cobroForm" style="align-items:flex-end;">
         <div class="field" style="margin-bottom:0;"><label>Fecha</label><input type="date" name="fechaCobro" value="${todayStr()}"></div>
-        <div class="field" style="margin-bottom:0;"><label>Monto</label><input type="number" name="monto"></div>
+        <div class="field" style="margin-bottom:0;"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto"></div>
         <div class="field" style="margin-bottom:0;"><label>¿Quién paga?</label>
           <select name="tipo"><option value="cliente">Cliente</option><option value="planner">Planner</option></select>
         </div>
@@ -1937,7 +2010,7 @@ function eventoDetailExtra(ev){
           </select>
         </div>
         <div class="field" style="margin-bottom:0;"><label>Cantidad</label><input type="number" name="cantidadCargo" value="1"></div>
-        <div class="field" style="margin-bottom:0;"><label>Precio unitario</label><input type="number" name="precioCargo" id="precioCargoAdicional" value="${ev.precioHoraAdicionalEvento || (state.presupuestoConfig&&state.presupuestoConfig.precioHoraAdicional) || 0}"></div>
+        <div class="field" style="margin-bottom:0;"><label>Precio unitario</label><input type="text" inputmode="decimal" class="input-monto" name="precioCargo" id="precioCargoAdicional" value="${ev.precioHoraAdicionalEvento || (state.presupuestoConfig&&state.presupuestoConfig.precioHoraAdicional) || 0}"></div>
         <div class="field" style="margin-bottom:0;"><label>Detalle (opcional)</label><input type="text" name="descripcionCargo" placeholder="Ej: 2 copas rotas"></div>
       </div>
       <button type="button" class="btn small" id="btnAgregarCargoAdicional" style="margin-top:8px;">+ Agregar cargo adicional</button>
@@ -2019,7 +2092,7 @@ function cobroFormFields(c){
     </div>
     <div class="field-row">
       <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${c.fecha||todayStr()}"></div>
-      <div class="field"><label>Monto</label><input type="number" name="monto" value="${c.monto||''}"></div>
+      <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${c.monto||''}"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>¿Quién paga?</label>
@@ -2210,16 +2283,16 @@ function renderPresupuestos(){
       <div class="section-hint" style="margin-top:-6px;">Estos valores son los que se usan al generar un presupuesto nuevo.</div>
       <form id="presupuestoConfigForm" style="margin-top:12px;">
         <div class="field-row">
-          <div class="field"><label>Precio por persona (joven)</label><input type="number" name="precioPersonaJoven" value="${cfg.precioPersonaJoven}"></div>
-          <div class="field"><label>Precio por persona (adulto)</label><input type="number" name="precioPersonaAdulto" value="${cfg.precioPersonaAdulto}"></div>
+          <div class="field"><label>Precio por persona (joven)</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaJoven" value="${cfg.precioPersonaJoven}"></div>
+          <div class="field"><label>Precio por persona (adulto)</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaAdulto" value="${cfg.precioPersonaAdulto}"></div>
         </div>
         <div class="field-row">
           <div class="field"><label>Horas base incluidas</label><input type="number" name="horasBaseIncluidas" value="${cfg.horasBaseIncluidas}"></div>
-          <div class="field"><label>Precio hora adicional</label><input type="number" name="precioHoraAdicional" value="${cfg.precioHoraAdicional}"></div>
+          <div class="field"><label>Precio hora adicional</label><input type="text" inputmode="decimal" class="input-monto" name="precioHoraAdicional" value="${cfg.precioHoraAdicional}"></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Precio por trago con alcohol (por unidad)</label><input type="number" name="precioTragoConAlcohol" value="${cfg.precioTragoConAlcohol}"></div>
-          <div class="field"><label>Precio por trago sin alcohol (por unidad)</label><input type="number" name="precioTragoSinAlcohol" value="${cfg.precioTragoSinAlcohol}"></div>
+          <div class="field"><label>Precio por trago con alcohol (por unidad)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoConAlcohol" value="${cfg.precioTragoConAlcohol}"></div>
+          <div class="field"><label>Precio por trago sin alcohol (por unidad)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoSinAlcohol" value="${cfg.precioTragoSinAlcohol}"></div>
         </div>
         <div class="field"><label>Zonas — una por línea, formato "nombre:ajuste" (0 si no suma nada)</label>
           <textarea name="zonas">${cfg.zonas.map(z=>`${z.nombre}:${z.ajuste}`).join('\n')}</textarea>
@@ -2255,7 +2328,7 @@ function tierBlockHtml(prefix, idx, precioDefault, vals){
   return `
     <div class="field-row" data-tier-block="${prefix}-${idx}" style="align-items:flex-end;">
       <div class="field" style="margin-bottom:8px;"><label>Cantidad de tragos</label><input type="number" name="${prefix}_${idx}_cantidad" value="${vals.cantidad||0}"></div>
-      <div class="field" style="margin-bottom:8px;"><label>Precio por trago</label><input type="number" name="${prefix}_${idx}_precio" value="${vals.precio!=null?vals.precio:precioDefault}"></div>
+      <div class="field" style="margin-bottom:8px;"><label>Precio por trago</label><input type="text" inputmode="decimal" class="input-monto" name="${prefix}_${idx}_precio" value="${vals.precio!=null?vals.precio:precioDefault}"></div>
       <button type="button" class="btn small danger" data-remove-tier="${prefix}-${idx}" style="margin-bottom:8px;">Quitar</button>
     </div>
   `;
@@ -2288,22 +2361,22 @@ function presupuestoFormFields(){
       </div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Precio hora adicional</label><input type="number" name="precioHoraAdicional" value="${cfg.precioHoraAdicional}"></div>
+      <div class="field"><label>Precio hora adicional</label><input type="text" inputmode="decimal" class="input-monto" name="precioHoraAdicional" value="${cfg.precioHoraAdicional}"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Precio trago adicional (c/alcohol)</label><input type="number" name="precioTragoConAlcoholRef" value="${cfg.precioTragoConAlcohol}"></div>
-      <div class="field"><label>Precio trago adicional (s/alcohol)</label><input type="number" name="precioTragoSinAlcoholRef" value="${cfg.precioTragoSinAlcohol}"></div>
+      <div class="field"><label>Precio trago adicional (c/alcohol)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoConAlcoholRef" value="${cfg.precioTragoConAlcohol}"></div>
+      <div class="field"><label>Precio trago adicional (s/alcohol)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoSinAlcoholRef" value="${cfg.precioTragoSinAlcohol}"></div>
     </div>
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Barra libre</label>
     <div class="section-hint" style="margin-top:-4px;">El precio por persona varía según el lugar y la cantidad — editalo libremente para este presupuesto.</div>
     <div class="field-row">
       <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes" value="0"></div>
-      <div class="field"><label>Precio por joven</label><input type="number" name="precioPersonaJoven" value="${cfg.precioPersonaJoven}"></div>
+      <div class="field"><label>Precio por joven</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaJoven" value="${cfg.precioPersonaJoven}"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos" value="0"></div>
-      <div class="field"><label>Precio por adulto</label><input type="number" name="precioPersonaAdulto" value="${cfg.precioPersonaAdulto}"></div>
+      <div class="field"><label>Precio por adulto</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaAdulto" value="${cfg.precioPersonaAdulto}"></div>
     </div>
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Opciones de tragos con alcohol (1 a 3)</label>
@@ -2393,7 +2466,7 @@ function openPresupuestoModal(){
         const tiers = [];
         container.querySelectorAll('[data-tier-block]').forEach(block=>{
           const cantidad = Number(block.querySelector('input[name$="_cantidad"]').value)||0;
-          const precio = Number(block.querySelector('input[name$="_precio"]').value)||0;
+          const precio = parseMonto(block.querySelector('input[name$="_precio"]').value);
           if(cantidad>0) tiers.push({cantidad, precio});
         });
         return tiers;
@@ -2410,11 +2483,11 @@ function openPresupuestoModal(){
         horas: Number(form.horas.value)||cfg.horasBaseIncluidas,
         zonaNombre: zona.nombre, zonaAjuste: zona.ajuste,
         jovenes: Number(form.jovenes.value)||0, adultos: Number(form.adultos.value)||0,
-        precioPersonaJoven: Number(form.precioPersonaJoven.value)||cfg.precioPersonaJoven,
-        precioPersonaAdulto: Number(form.precioPersonaAdulto.value)||cfg.precioPersonaAdulto,
-        horasBaseIncluidas: cfg.horasBaseIncluidas, precioHoraAdicional: Number(form.precioHoraAdicional.value)||cfg.precioHoraAdicional,
-        precioTragoConAlcohol: Number(form.precioTragoConAlcoholRef.value)||cfg.precioTragoConAlcohol,
-        precioTragoSinAlcohol: Number(form.precioTragoSinAlcoholRef.value)||cfg.precioTragoSinAlcohol,
+        precioPersonaJoven: parseMonto(form.precioPersonaJoven.value)||cfg.precioPersonaJoven,
+        precioPersonaAdulto: parseMonto(form.precioPersonaAdulto.value)||cfg.precioPersonaAdulto,
+        horasBaseIncluidas: cfg.horasBaseIncluidas, precioHoraAdicional: parseMonto(form.precioHoraAdicional.value)||cfg.precioHoraAdicional,
+        precioTragoConAlcohol: parseMonto(form.precioTragoConAlcoholRef.value)||cfg.precioTragoConAlcohol,
+        precioTragoSinAlcohol: parseMonto(form.precioTragoSinAlcoholRef.value)||cfg.precioTragoSinAlcohol,
         tragosConAlcohol, tragosSinAlcohol,
         incluye: [...cfg.incluye], observaciones: [...cfg.observaciones],
       };
@@ -2786,13 +2859,27 @@ function renderPersonal(){
     </div>`}
 
     <div class="card">
+      <h3 style="margin-top:0; font-size:0.95rem;">Agregar función nueva</h3>
+      <div class="section-hint" style="margin-top:-6px;">Cargá una función que no esté en la lista (por ejemplo "DJ" o "Mozo"), con su tarifa — queda disponible para asignar a personas y usar en Producción de una vez.</div>
+      <div class="field-row" style="margin-top:12px; align-items:flex-end;">
+        <div class="field" style="flex:2;"><label>Nombre de la función</label><input type="text" id="nuevaFuncionNombre" placeholder="Ej: DJ"></div>
+        <div class="field" style="flex:1;"><label>Tarifa normal</label><input type="text" inputmode="decimal" class="input-monto" id="nuevaFuncionTarifa" value="0"></div>
+        <div class="field" style="flex:1;"><label>Tarifa fuera de Asunción</label><input type="text" inputmode="decimal" class="input-monto" id="nuevaFuncionTarifaFuera" value="0"></div>
+      </div>
+      <button type="button" id="btnAgregarFuncion" class="btn small">+ Agregar función</button>
+      ${(state.rolesExtra||[]).length>0 ? `
+      <div class="section-hint" style="margin-top:14px; margin-bottom:6px;">Funciones agregadas: ${state.rolesExtra.join(', ')}</div>
+      ` : ''}
+    </div>
+
+    <div class="card">
       <h3 style="margin-top:0; font-size:0.95rem;">Tarifas diarias por función</h3>
       <div class="section-hint" style="margin-top:-6px;">Se usan como valor sugerido al cargar un día trabajado en "Producción / Limpieza" — si una persona tiene tarifa propia (arriba), esa tiene prioridad.</div>
       <form id="tarifasForm" style="margin-top:12px;">
-        ${ROLES.map(r=>`
+        ${todosLosRoles().map(r=>`
           <div class="field-row" style="align-items:center;">
             <div style="flex:1; font-size:0.88rem;">${r}</div>
-            <div class="field" style="flex:1; margin-bottom:8px;"><input type="number" name="tarifa_${r}" value="${state.tarifas[r]||0}"></div>
+            <div class="field" style="flex:1; margin-bottom:8px;"><input type="text" inputmode="decimal" class="input-monto" name="tarifa_${r}" value="${state.tarifas[r]||0}"></div>
           </div>
         `).join('')}
         <button type="button" id="btnGuardarTarifas" class="btn small">Guardar tarifas</button>
@@ -2803,10 +2890,10 @@ function renderPersonal(){
       <h3 style="margin-top:0; font-size:0.95rem;">Tarifas para eventos fuera de Asunción</h3>
       <div class="section-hint" style="margin-top:-6px;">Se usan en vez de las tarifas normales cuando el día trabajado se marca como "fuera de Asunción" — salvo que la persona tenga tarifa propia, que siempre tiene prioridad.</div>
       <form id="tarifasFueraForm" style="margin-top:12px;">
-        ${ROLES.map(r=>`
+        ${todosLosRoles().map(r=>`
           <div class="field-row" style="align-items:center;">
             <div style="flex:1; font-size:0.88rem;">${r}</div>
-            <div class="field" style="flex:1; margin-bottom:8px;"><input type="number" name="tarifaFuera_${r}" value="${state.tarifasFueraAsuncion[r]||0}"></div>
+            <div class="field" style="flex:1; margin-bottom:8px;"><input type="text" inputmode="decimal" class="input-monto" name="tarifaFuera_${r}" value="${state.tarifasFueraAsuncion[r]||0}"></div>
           </div>
         `).join('')}
         <button type="button" id="btnGuardarTarifasFuera" class="btn small">Guardar tarifas fuera de Asunción</button>
@@ -2825,11 +2912,11 @@ function personalFormFields(p){
     <div class="field"><label>Nombre</label><input type="text" name="nombre" value="${p.nombre||''}"></div>
     <div class="field-row">
       <div class="field"><label>Rol</label>
-        <select name="rol">${ROLES.map(r=>`<option value="${r}" ${p.rol===r?'selected':''}>${r}</option>`).join('')}</select>
+        <select name="rol">${todosLosRoles().map(r=>`<option value="${r}" ${p.rol===r?'selected':''}>${r}</option>`).join('')}</select>
       </div>
       <div class="field"><label>Teléfono</label><input type="text" name="telefono" value="${p.telefono||''}"></div>
     </div>
-    <div class="field"><label>Tarifa diaria propia (opcional)</label><input type="number" name="tarifaPersonalizada" value="${p.tarifaPersonalizada||''}" placeholder="Si la dejás vacía, se usa la tarifa general de su función"></div>
+    <div class="field"><label>Tarifa diaria propia (opcional)</label><input type="text" inputmode="decimal" class="input-monto" name="tarifaPersonalizada" value="${p.tarifaPersonalizada||''}" placeholder="Si la dejás vacía, se usa la tarifa general de su función"></div>
     <div class="field"><label>Notas</label><textarea name="notas">${p.notas||''}</textarea></div>
   `;
 }
@@ -2839,7 +2926,7 @@ function openPersonalModal(id){
     title: p ? 'Editar persona' : 'Nueva persona',
     bodyHtml: personalFormFields(p),
     onSave: (form)=>{
-      const data = { nombre: form.nombre.value.trim(), rol: form.rol.value, telefono: form.telefono.value.trim(), tarifaPersonalizada: form.tarifaPersonalizada.value, notas: form.notas.value.trim() };
+      const data = { nombre: form.nombre.value.trim(), rol: form.rol.value, telefono: form.telefono.value.trim(), tarifaPersonalizada: parseMonto(form.tarifaPersonalizada.value), notas: form.notas.value.trim() };
       if(!data.nombre) return alert('Ingresá un nombre.');
       if(p){ Object.assign(p, data); pushLog(adminUnlocked.nombre, 'Persona del equipo editada', data.nombre); } else { state.personal.push(Object.assign({id:uid()}, data)); pushLog(adminUnlocked.nombre, 'Persona agregada al equipo', data.nombre); }
       saveState(); closeModal(); render();
@@ -3013,25 +3100,25 @@ function renderProduccion(){
 }
 function produccionFormFields(r){
   r = r || {extensionTipo:'ninguna'};
-  const funcionInicial = r.funcion || ROLES[0];
+  const funcionInicial = r.funcion || todosLosRoles()[0];
   return `
     <div class="field-row">
       <div class="field"><label>Persona</label>
         <select name="personaId" id="prodPersona">${state.personal.map(p=>`<option value="${p.id}" ${r.personaId===p.id?'selected':''}>${p.nombre}</option>`).join('')}</select>
       </div>
       <div class="field"><label>Función realizada ese día</label>
-        <select name="funcion" id="prodFuncion">${ROLES.map(f=>`<option value="${f}" ${funcionInicial===f?'selected':''}>${f}</option>`).join('')}</select>
+        <select name="funcion" id="prodFuncion">${todosLosRoles().map(f=>`<option value="${f}" ${funcionInicial===f?'selected':''}>${f}</option>`).join('')}</select>
       </div>
     </div>
     <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${r.fecha||todayStr()}"></div>
     <div class="checkline"><input type="checkbox" name="fueraAsuncion" id="prodFueraAsuncion" ${r.fueraAsuncion?'checked':''}><label for="prodFueraAsuncion">Evento fuera de Asunción</label></div>
     <div class="field"><label>Descripción</label><textarea name="descripcion" placeholder="Qué hizo, para qué evento…">${r.descripcion||''}</textarea></div>
-    <div class="field"><label>Tarifa base del día</label><input type="number" name="tarifaBase" id="prodTarifa" value="${r.tarifaBase||0}"></div>
+    <div class="field"><label>Tarifa base del día</label><input type="text" inputmode="decimal" class="input-monto" name="tarifaBase" id="prodTarifa" value="${r.tarifaBase||0}"></div>
     <div class="field-row">
       <div class="field"><label>Extensión</label>
         <select name="extensionTipo" id="prodExtTipo">${EXTENSIONES.map(([v,l])=>`<option value="${v}" ${r.extensionTipo===v?'selected':''}>${l}</option>`).join('')}</select>
       </div>
-      <div class="field" id="prodExtMontoWrap" style="${(!r.extensionTipo||r.extensionTipo==='ninguna')?'display:none;':''}"><label>Monto de la extensión</label><input type="number" name="extensionMonto" value="${r.extensionMonto||''}"></div>
+      <div class="field" id="prodExtMontoWrap" style="${(!r.extensionTipo||r.extensionTipo==='ninguna')?'display:none;':''}"><label>Monto de la extensión</label><input type="text" inputmode="decimal" class="input-monto" name="extensionMonto" value="${r.extensionMonto||''}"></div>
     </div>
     <div class="field" id="prodExtDescWrap" style="${(!r.extensionTipo||r.extensionTipo==='ninguna')?'display:none;':''}"><label>Motivo de la extensión</label><input type="text" name="extensionDescripcion" value="${r.extensionDescripcion||''}" placeholder="Ej: 2 horas extra de armado"></div>
 
@@ -3076,9 +3163,9 @@ function openProduccionModal(id){
       const data = {
         personaId: form.personaId.value, funcion: form.funcion.value, fecha: form.fecha.value,
         fueraAsuncion: form.fueraAsuncion.checked,
-        descripcion: form.descripcion.value.trim(), tarifaBase: form.tarifaBase.value,
+        descripcion: form.descripcion.value.trim(), tarifaBase: parseMonto(form.tarifaBase.value),
         extensionTipo: form.extensionTipo.value,
-        extensionMonto: form.extensionTipo.value!=='ninguna' ? form.extensionMonto.value : 0,
+        extensionMonto: form.extensionTipo.value!=='ninguna' ? parseMonto(form.extensionMonto.value) : 0,
         extensionDescripcion: form.extensionTipo.value!=='ninguna' ? form.extensionDescripcion.value.trim() : '',
         horasExtra: Number(form.horasExtra.value)||0,
         tragosExtraCantidad: Number(form.tragosExtraCantidad.value)||0,
@@ -3123,7 +3210,7 @@ function parseWorkerText(texto){
     const parts = l.split('|').map(p=>p.trim());
     if(parts.length<3 || !dateRe.test(parts[0])) return;
     const fecha = parts[0];
-    const matchRol = ROLES.find(rr=>rr.toLowerCase()===parts[1].toLowerCase());
+    const matchRol = todosLosRoles().find(rr=>rr.toLowerCase()===parts[1].toLowerCase());
     const funcion = matchRol || 'Otro';
     const descripcion = parts[2] || '';
     const extras = {};
@@ -3263,7 +3350,7 @@ function compraFormFields(c){
     </div>
     <div class="field-row">
       <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${c.fecha||todayStr()}"></div>
-      <div class="field"><label>Monto</label><input type="number" name="monto" value="${c.monto||''}"></div>
+      <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${c.monto||''}"></div>
     </div>
     <div class="field"><label>Caja de donde sale el dinero</label>
       <select name="cajaId">${cajasDisponibles().map(cc=>`<option value="${cc.id}" ${(c.cajaId||cajaSugerida)===cc.id?'selected':''}>${cc.nombre}</option>`).join('')}</select>
@@ -3433,7 +3520,7 @@ function gastoFormFields(g){
     </div>
     <div class="field-row">
       <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${g.fecha||todayStr()}"></div>
-      <div class="field"><label>Monto</label><input type="number" name="monto" value="${g.monto||''}"></div>
+      <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${g.monto||''}"></div>
     </div>
     <div class="field"><label>Categoría</label><input type="text" name="categoria" value="${g.categoria||''}" placeholder="Seña, inversión, sueldo, gasto diario, equipamiento…"></div>
     <div class="field"><label>Descripción</label><textarea name="descripcion">${g.descripcion||''}</textarea></div>
@@ -3568,7 +3655,7 @@ function transferenciaFormFields(cajaOrigenId){
     <div class="field" style="margin-top:12px;"><label>Caja de destino</label>
       <select name="cajaDestinoId">${destinos.map(c=>`<option value="${c.id}">${c.nombre}${c.administradorId?' — '+(state.admins.find(a=>a.id===c.administradorId)||{}).nombre:''}</option>`).join('')}</select>
     </div>
-    <div class="field"><label>Monto</label><input type="number" name="monto"></div>
+    <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto"></div>
     <div class="field"><label>Motivo</label><input type="text" name="motivo" placeholder="Ej: Devolución de préstamo entre cajas"></div>
   `;
 }
@@ -3578,7 +3665,7 @@ function openTransferenciaModal(cajaOrigenId){
     bodyHtml: transferenciaFormFields(cajaOrigenId),
     customSubmitLabel: 'Enviar transferencia',
     onSave: (form)=>{
-      const monto = Number(form.monto.value)||0;
+      const monto = parseMonto(form.monto.value);
       if(monto<=0) return alert('Ingresá un monto válido.');
       const cajaDestinoId = form.cajaDestinoId.value;
       state.transferenciasCaja.push({
@@ -3647,7 +3734,7 @@ function cajaFormFields(c){
         </select>
       </div>
     </div>
-    <div class="field"><label>Saldo inicial (opcional)</label><input type="number" name="saldoInicial" value="${c.saldoInicial||''}"></div>
+    <div class="field"><label>Saldo inicial (opcional)</label><input type="text" inputmode="decimal" class="input-monto" name="saldoInicial" value="${c.saldoInicial||''}"></div>
   `;
 }
 function openCajaModal(id){
@@ -3656,7 +3743,7 @@ function openCajaModal(id){
     title: c ? 'Editar caja' : 'Nueva caja',
     bodyHtml: cajaFormFields(c),
     onSave: (form)=>{
-      const data = { nombre: form.nombre.value.trim(), tipo: form.tipo.value, administradorId: form.administradorId.value||null, saldoInicial: form.saldoInicial.value };
+      const data = { nombre: form.nombre.value.trim(), tipo: form.tipo.value, administradorId: form.administradorId.value||null, saldoInicial: parseMonto(form.saldoInicial.value) };
       if(!data.nombre) return alert('Ingresá un nombre para la caja.');
       if(c){ Object.assign(c, data); pushLog(adminUnlocked.nombre, 'Caja editada', data.nombre); } else { state.cajas.push(Object.assign({id:uid()}, data)); pushLog(adminUnlocked.nombre, 'Caja creada', data.nombre); }
       saveState(); closeModal(); render();
@@ -3794,7 +3881,7 @@ function pagoFormFields(p){
     </div>
     <div class="field-row">
       <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${p.fecha||todayStr()}"></div>
-      <div class="field"><label>Monto</label><input type="number" name="monto" value="${p.monto||''}"></div>
+      <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${p.monto||''}"></div>
     </div>
     <div class="field"><label>Caja de donde sale el dinero</label>
       <select name="cajaId">${cajasDisponibles().map(cc=>`<option value="${cc.id}" ${(p.cajaId||cajaSugerida)===cc.id?'selected':''}>${cc.nombre}</option>`).join('')}</select>
@@ -4071,22 +4158,39 @@ function openImportPagoModal(){
 }
 
 // ================= REPORTES =================
-function resumenPorAdmin(){
+function resumenPorAdmin(mesFiltro){
+  const enMes = (fecha)=> !mesFiltro || (fecha && fecha.slice(0,7)===mesFiltro);
   return state.admins.map(a=>{
-    const ingresosGastos = sumaWhere(state.gastos, g=>g.adminId===a.id && g.movimiento==='ingreso');
-    const egresosGastos = sumaWhere(state.gastos, g=>g.adminId===a.id && g.movimiento==='egreso');
-    const ingresosCobros = sumaWhere(state.cobros, c=>c.adminId===a.id);
-    const egresosCompras = sumaWhere(state.compras, c=>c.adminId===a.id);
-    const egresosPagos = sumaWhere(state.pagos, p=>p.adminId===a.id);
+    const ingresosGastos = sumaWhere(state.gastos, g=>g.adminId===a.id && g.movimiento==='ingreso' && enMes(g.fecha));
+    const egresosGastosVarios = sumaWhere(state.gastos, g=>g.adminId===a.id && g.movimiento==='egreso' && enMes(g.fecha));
+    const ingresosCobros = sumaWhere(state.cobros, c=>c.adminId===a.id && enMes(c.fecha));
+    const egresosCompras = sumaWhere(state.compras, c=>c.adminId===a.id && enMes(c.fecha));
+    const egresosPagosPersonal = sumaWhere(state.pagos, p=>p.adminId===a.id && enMes(p.fecha));
     const cargadoIngresos = ingresosGastos + ingresosCobros;
-    const cargadoEgresos = egresosGastos + egresosCompras + egresosPagos;
+    const cargadoEgresos = egresosGastosVarios + egresosCompras + egresosPagosPersonal;
     const cajasPropias = state.cajas.filter(c=>c.administradorId===a.id);
     return {
       admin: a,
       cargadoIngresos, cargadoEgresos, cargadoNeto: cargadoIngresos - cargadoEgresos,
+      egresosDetalle: { compras: egresosCompras, gastos: egresosGastosVarios, pagosPersonal: egresosPagosPersonal },
       cajas: cajasPropias.map(c=>({ nombre: c.nombre, saldo: saldoCaja(c.id) })),
     };
   });
+}
+function resumenPagosPersonal(){
+  const pagadoPorPersona = {};
+  const pendientePorPersona = {};
+  state.pagos.forEach(p=>{ pagadoPorPersona[p.personaId] = (pagadoPorPersona[p.personaId]||0) + (Number(p.monto)||0); });
+  state.produccion.filter(r=>!r.pagado).forEach(r=>{ pendientePorPersona[r.personaId] = (pendientePorPersona[r.personaId]||0) + totalRegistro(r); });
+  state.gastosPersonal.filter(g=>!g.pagado).forEach(g=>{ pendientePorPersona[g.personaId] = (pendientePorPersona[g.personaId]||0) + (Number(g.monto)||0); });
+  const totalPagado = Object.values(pagadoPorPersona).reduce((a,b)=>a+b,0);
+  const totalPendiente = Object.values(pendientePorPersona).reduce((a,b)=>a+b,0);
+  const idsPersonas = [...new Set([...Object.keys(pagadoPorPersona), ...Object.keys(pendientePorPersona)])];
+  const porPersona = idsPersonas.map(pid=>{
+    const per = personaDe(pid);
+    return { nombre: per?per.nombre:'(persona eliminada)', pagado: pagadoPorPersona[pid]||0, pendiente: pendientePorPersona[pid]||0 };
+  }).sort((a,b)=> (b.pagado+b.pendiente) - (a.pagado+a.pendiente));
+  return { totalPagado, totalPendiente, porPersona };
 }
 function renderReportes(){
   const meses = {};
@@ -4099,7 +4203,7 @@ function renderReportes(){
     if(g.movimiento==='ingreso') m.ingresosCaja += Number(g.monto)||0; else m.egresosCaja += Number(g.monto)||0;
   });
   const keys = Object.keys(meses).sort().reverse();
-  const porAdmin = resumenPorAdmin();
+  const porAdmin = resumenPorAdmin(reportesMesFiltro || null);
   return `
     <div class="row-between">
       <div><h2 class="section-title">Reportes</h2><div class="section-hint">Resumen mes a mes — eventos, cobros a clientes y movimientos de caja.</div></div>
@@ -4108,7 +4212,12 @@ function renderReportes(){
     ${porAdmin.length>0 ? `
     <div class="row-between" style="margin-top:6px;">
       <h3 style="font-size:1rem; margin:0;">Ingresos y egresos por administrador</h3>
+      <select id="reportesMesSelect" style="max-width:200px;">
+        <option value="">Todo el histórico</option>
+        ${keys.map(m=>`<option value="${m}" ${reportesMesFiltro===m?'selected':''}>${new Date(m+'-01T00:00:00').toLocaleDateString('es-PY',{month:'long', year:'numeric'})}</option>`).join('')}
+      </select>
     </div>
+    <div class="section-hint" style="margin-top:-4px; margin-bottom:10px;">${reportesMesFiltro ? 'Solo '+new Date(reportesMesFiltro+'-01T00:00:00').toLocaleDateString('es-PY',{month:'long', year:'numeric'}) : 'Histórico completo'} — lo que cada uno cargó personalmente en el sistema.</div>
     <div class="grid-cards" style="margin-top:10px;">
       ${porAdmin.map(r=>`
         <div class="card">
@@ -4119,6 +4228,12 @@ function renderReportes(){
             <div><div class="k" style="font-size:0.7rem;">Egresos</div><div class="mono" style="color:var(--red);">${fmtMoney(r.cargadoEgresos)}</div></div>
             <div><div class="k" style="font-size:0.7rem;">Neto</div><div class="mono" style="color:${r.cargadoNeto>=0?'var(--sage)':'var(--red)'};">${fmtMoney(r.cargadoNeto)}</div></div>
           </div>
+          <div class="section-hint" style="margin-bottom:4px;">Desglose de egresos</div>
+          <div style="display:flex; flex-direction:column; gap:3px; font-size:0.82rem; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between;"><span>Compras</span><span class="mono">${fmtMoney(r.egresosDetalle.compras)}</span></div>
+            <div style="display:flex; justify-content:space-between;"><span>Gastos e inversiones</span><span class="mono">${fmtMoney(r.egresosDetalle.gastos)}</span></div>
+            <div style="display:flex; justify-content:space-between;"><span>Pagos a personal</span><span class="mono">${fmtMoney(r.egresosDetalle.pagosPersonal)}</span></div>
+          </div>
           ${r.cajas.length>0 ? `
           <div class="section-hint" style="margin-bottom:4px;">Su/s caja/s</div>
           ${r.cajas.map(c=>`<div style="display:flex; justify-content:space-between; font-size:0.85rem;"><span>${c.nombre}</span><span class="mono" style="color:${c.saldo>=0?'var(--sage)':'var(--red)'};">${fmtMoney(c.saldo)}</span></div>`).join('')}
@@ -4127,6 +4242,70 @@ function renderReportes(){
       `).join('')}
     </div>
     <div style="height:20px;"></div>` : ''}
+
+    ${(()=>{
+      const eventos = state.eventos.filter(e=>e.estado==='reservado');
+      if(eventos.length===0) return '';
+      const conEstado = eventos.map(e=>({ ev:e, estado: estadoCicloEvento(e) }));
+      const abiertos = conEstado.filter(x=>!x.estado.cerrado).sort((a,b)=>(a.ev.fecha||'').localeCompare(b.ev.fecha||''));
+      const cerrados = conEstado.filter(x=>x.estado.cerrado);
+      return `
+      <div class="row-between" style="margin-top:6px;">
+        <h3 style="font-size:1rem; margin:0;">Ciclo de eventos</h3>
+      </div>
+      <div class="section-hint" style="margin-top:-4px; margin-bottom:10px;">Un evento cierra su ciclo cuando el personal asignado está todo pagado, la comisión del planner (si hay) está pagada, y el cliente no debe saldo.</div>
+      ${abiertos.length>0 ? `
+      <div class="card">
+        <h4 style="margin:0 0 10px; font-size:0.88rem;">Ciclo abierto (${abiertos.length})</h4>
+        <div class="list-simple">
+          ${abiertos.map(({ev,estado})=>`
+            <div class="li">
+              <div><div class="t">${ev.lugar||'(sin lugar)'}</div><div class="d">${fmtDate(ev.fecha)}</div></div>
+              <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+                ${!estado.personalPagado?'<span class="badge senado">Personal pendiente</span>':''}
+                ${estado.tienePlanner && !estado.comisionPagada?'<span class="badge senado">Comisión planner pendiente</span>':''}
+                ${!estado.saldoCerrado?'<span class="badge senado">Saldo cliente pendiente</span>':''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </div>` : '<div class="empty">No hay eventos reservados con el ciclo abierto — todo cerrado.</div>'}
+      ${cerrados.length>0 ? `
+      <details style="margin-top:10px;">
+        <summary style="cursor:pointer; color:var(--cream-dim); font-size:0.85rem;">Ver ${cerrados.length} evento(s) con ciclo cerrado</summary>
+        <div class="card" style="margin-top:10px;">
+          <div class="list-simple">
+            ${cerrados.map(({ev})=>`<div class="li"><div class="t">${ev.lugar||'(sin lugar)'}</div><div class="d mono">${fmtDate(ev.fecha)}</div></div>`).join('')}
+          </div>
+        </div>
+      </details>` : ''}
+      <div style="height:20px;"></div>
+      `;
+    })()}
+
+    ${(()=>{ const pp = resumenPagosPersonal(); if(pp.porPersona.length===0) return ''; return `
+    <div class="row-between" style="margin-top:6px;">
+      <h3 style="font-size:1rem; margin:0;">Pago de personas</h3>
+    </div>
+    <div class="grid-cards" style="margin-top:10px; margin-bottom:10px;">
+      <div class="stat"><div class="k">Total pagado (histórico)</div><div class="v sage">${fmtMoney(pp.totalPagado)}</div></div>
+      <div class="stat"><div class="k">Total pendiente ahora</div><div class="v" style="color:var(--gold);">${fmtMoney(pp.totalPendiente)}</div></div>
+    </div>
+    <div class="card">
+      <div class="list-simple">
+        ${pp.porPersona.map(p=>`
+          <div class="li">
+            <div class="t">${p.nombre}</div>
+            <div style="display:flex; gap:16px;">
+              <div style="text-align:right;"><div class="k" style="font-size:0.68rem;">Pagado</div><div class="mono" style="color:var(--sage); font-size:0.85rem;">${fmtMoney(p.pagado)}</div></div>
+              <div style="text-align:right;"><div class="k" style="font-size:0.68rem;">Pendiente</div><div class="mono" style="color:${p.pendiente>0?'var(--gold)':'var(--cream-dim)'}; font-size:0.85rem;">${fmtMoney(p.pendiente)}</div></div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    <div style="height:20px;"></div>
+    `; })()}
 
     ${keys.length===0 ? '<div class="empty">Todavía no hay datos suficientes para armar un reporte.</div>' : keys.map(m=>{
       const d = meses[m];
@@ -4385,12 +4564,12 @@ function bindPanelEvents(){
   if(btnGuardarPresupuestoConfig) btnGuardarPresupuestoConfig.addEventListener('click', ()=>{
     const f = presupuestoConfigForm;
     state.presupuestoConfig = {
-      precioPersonaJoven: Number(f.precioPersonaJoven.value)||0,
-      precioPersonaAdulto: Number(f.precioPersonaAdulto.value)||0,
+      precioPersonaJoven: parseMonto(f.precioPersonaJoven.value),
+      precioPersonaAdulto: parseMonto(f.precioPersonaAdulto.value),
       horasBaseIncluidas: Number(f.horasBaseIncluidas.value)||0,
-      precioHoraAdicional: Number(f.precioHoraAdicional.value)||0,
-      precioTragoConAlcohol: Number(f.precioTragoConAlcohol.value)||0,
-      precioTragoSinAlcohol: Number(f.precioTragoSinAlcohol.value)||0,
+      precioHoraAdicional: parseMonto(f.precioHoraAdicional.value),
+      precioTragoConAlcohol: parseMonto(f.precioTragoConAlcohol.value),
+      precioTragoSinAlcohol: parseMonto(f.precioTragoSinAlcohol.value),
       zonas: parseZonas(f.zonas.value),
       incluye: parseLineas(f.incluye.value),
       observaciones: parseLineas(f.observaciones.value),
@@ -4404,18 +4583,36 @@ function bindPanelEvents(){
   panel.querySelectorAll('[data-open-personal]').forEach(b=>b.addEventListener('click', ()=>openPersonalModal(b.dataset.openPersonal)));
 
   const tarifasForm = document.getElementById('tarifasForm');
+  const reportesMesSelect = document.getElementById('reportesMesSelect');
+  if(reportesMesSelect) reportesMesSelect.addEventListener('change', ()=>{ reportesMesFiltro = reportesMesSelect.value; renderPanel(); });
+
+  const btnAgregarFuncion = document.getElementById('btnAgregarFuncion');
+  if(btnAgregarFuncion) btnAgregarFuncion.addEventListener('click', ()=>{
+    const nombre = document.getElementById('nuevaFuncionNombre').value.trim();
+    if(!nombre) return alert('Ingresá un nombre para la función.');
+    if(todosLosRoles().some(r=>r.toLowerCase()===nombre.toLowerCase())) return alert('Ya existe una función con ese nombre.');
+    const tarifa = parseMonto(document.getElementById('nuevaFuncionTarifa').value);
+    const tarifaFuera = parseMonto(document.getElementById('nuevaFuncionTarifaFuera').value);
+    state.rolesExtra = state.rolesExtra || [];
+    state.rolesExtra.push(nombre);
+    state.tarifas[nombre] = tarifa;
+    state.tarifasFueraAsuncion[nombre] = tarifaFuera;
+    pushLog(adminUnlocked.nombre, 'Función nueva agregada', `${nombre} — normal ${fmtMoney(tarifa)} / fuera de Asunción ${fmtMoney(tarifaFuera)}`);
+    saveState(); renderPanel();
+  });
+
   const btnGuardarTarifas = document.getElementById('btnGuardarTarifas');
   if(btnGuardarTarifas) btnGuardarTarifas.addEventListener('click', ()=>{
-    ROLES.forEach(r=>{ state.tarifas[r] = tarifasForm[`tarifa_${r}`].value; });
-    pushLog(adminUnlocked.nombre, 'Tarifas por función actualizadas', ROLES.map(r=>`${r}: ${fmtMoney(state.tarifas[r])}`).join(', '));
+    todosLosRoles().forEach(r=>{ state.tarifas[r] = parseMonto(tarifasForm[`tarifa_${r}`].value); });
+    pushLog(adminUnlocked.nombre, 'Tarifas por función actualizadas', todosLosRoles().map(r=>`${r}: ${fmtMoney(state.tarifas[r])}`).join(', '));
     saveState(); renderPanel();
   });
 
   const tarifasFueraForm = document.getElementById('tarifasFueraForm');
   const btnGuardarTarifasFuera = document.getElementById('btnGuardarTarifasFuera');
   if(btnGuardarTarifasFuera) btnGuardarTarifasFuera.addEventListener('click', ()=>{
-    ROLES.forEach(r=>{ state.tarifasFueraAsuncion[r] = tarifasFueraForm[`tarifaFuera_${r}`].value; });
-    pushLog(adminUnlocked.nombre, 'Tarifas fuera de Asunción actualizadas', ROLES.map(r=>`${r}: ${fmtMoney(state.tarifasFueraAsuncion[r])}`).join(', '));
+    todosLosRoles().forEach(r=>{ state.tarifasFueraAsuncion[r] = parseMonto(tarifasFueraForm[`tarifaFuera_${r}`].value); });
+    pushLog(adminUnlocked.nombre, 'Tarifas fuera de Asunción actualizadas', todosLosRoles().map(r=>`${r}: ${fmtMoney(state.tarifasFueraAsuncion[r])}`).join(', '));
     saveState(); renderPanel();
   });
 
@@ -4520,7 +4717,7 @@ function bindPanelEvents(){
       insumos: state.insumos, movimientosInsumo: state.movimientosInsumo,
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
-      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja,
+      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra,
     }, null, 2);
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -4560,6 +4757,7 @@ function bindPanelEvents(){
         state.colaboradoresLimitados = parsed.colaboradoresLimitados || [];
         state.cargosAdicionales = parsed.cargosAdicionales || [];
         state.transferenciasCaja = parsed.transferenciasCaja || [];
+        state.rolesExtra = parsed.rolesExtra || [];
         if(parsed.admins && parsed.admins.length) state.admins = parsed.admins;
         if(parsed.log && parsed.log.length) state.log = parsed.log;
         pushLog(adminUnlocked.nombre, 'Importó copia de seguridad completa', file.name);
@@ -4698,7 +4896,7 @@ function renderMisGastosColaborador(){
       <form id="colabGastoForm">
         <div class="field-row">
           <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${todayStr()}"></div>
-          <div class="field"><label>Monto</label><input type="number" name="monto"></div>
+          <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto"></div>
         </div>
         <div class="field"><label>Descripción</label><input type="text" name="descripcion" placeholder="Qué compraste, para qué evento…"></div>
         <div class="section-hint" style="margin:-6px 0 10px;">Si sacaste foto de la factura, mandásela por WhatsApp a un administrador además de cargar esto acá.</div>
@@ -4724,7 +4922,7 @@ function bindMisGastosColaborador(){
   if(!btn) return;
   btn.addEventListener('click', ()=>{
     const form = document.getElementById('colabGastoForm');
-    const monto = Number(form.monto.value)||0;
+    const monto = parseMonto(form.monto.value);
     if(!monto){ alert('Ingresá un monto.'); return; }
     state.gastosPersonal.push({
       id: uid(), personaId: colaboradorLimitadoUnlocked.personaId, fecha: form.fecha.value,
@@ -4749,7 +4947,7 @@ function renderWorkerMode(){
       <form id="workerForm" style="margin-top:14px;">
         <div class="field"><label>Tu nombre</label><input type="text" name="nombre" value="${workerEntries.length? workerEntries[workerEntries.length-1].nombre : ''}"></div>
         <div class="field-row">
-          <div class="field"><label>Función que hiciste</label><select name="funcion">${ROLES.map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
+          <div class="field"><label>Función que hiciste</label><select name="funcion">${todosLosRoles().map(r=>`<option value="${r}">${r}</option>`).join('')}</select></div>
           <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${todayStr()}"></div>
         </div>
         <div class="field"><label>Descripción</label><textarea name="descripcion" placeholder="Qué hiciste, para qué evento…"></textarea></div>
@@ -4780,7 +4978,7 @@ function renderWorkerMode(){
         <div class="field"><label>Tu nombre</label><input type="text" name="nombreGasto" value="${workerGastos.length? workerGastos[workerGastos.length-1].nombre : (workerEntries.length? workerEntries[workerEntries.length-1].nombre : '')}"></div>
         <div class="field-row">
           <div class="field"><label>Fecha</label><input type="date" name="fechaGasto" value="${todayStr()}"></div>
-          <div class="field"><label>Monto</label><input type="number" name="montoGasto"></div>
+          <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="montoGasto"></div>
         </div>
         <div class="field"><label>Descripción</label><input type="text" name="descripcionGasto" placeholder="Qué compraste, para qué evento…"></div>
         <div class="section-hint" style="margin:-6px 0 10px;">Si sacaste foto de la factura, mandásela por WhatsApp junto con este resumen.</div>
@@ -4858,7 +5056,7 @@ function renderWorkerMode(){
   if(btnWorkerAgregarGasto) btnWorkerAgregarGasto.addEventListener('click', ()=>{
     const gform = document.getElementById('workerGastoForm');
     const nombre = gform.nombreGasto.value.trim();
-    const monto = Number(gform.montoGasto.value)||0;
+    const monto = parseMonto(gform.montoGasto.value);
     if(!nombre){ alert('Ingresá tu nombre.'); return; }
     if(!monto){ alert('Ingresá un monto.'); return; }
     workerGastos.push({
