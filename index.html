@@ -479,10 +479,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   nav.tabs button:hover{ color:var(--cream); }
   nav.tabs button.active{ color:var(--copper-bright); border-bottom-color:var(--copper); }
 
+  .stat.clickable, .card.clickable{ cursor:pointer; transition:transform .12s ease, border-color .12s ease; }
+  .stat.clickable:hover, .card.clickable:hover{ border-color:var(--copper); transform:translateY(-2px); }
+
   nav.secciones-nav{
-    display:flex; gap:8px; overflow-x:auto; scrollbar-width:none; margin:20px 0 4px; padding-bottom:2px;
+    display:flex; flex-wrap:wrap; gap:8px; margin:20px 0 4px; padding-bottom:2px;
   }
-  nav.secciones-nav::-webkit-scrollbar{ display:none; }
   nav.secciones-nav button{
     background:var(--ink-2); border:1px solid var(--line); color:var(--cream-dim);
     font-family:'Work Sans', sans-serif; font-size:0.86rem; font-weight:600;
@@ -752,6 +754,10 @@ function formatearInputsMonto(root){
   });
 }
 new MutationObserver(()=>formatearInputsMonto(document)).observe(document.body, {childList:true, subtree:true});
+document.addEventListener('click', function(e){
+  const el = e.target.closest('[data-goto-tab]');
+  if(el){ currentTab = el.dataset.gotoTab; render(); }
+});
 function fmtDate(d){
   if(!d) return '—';
   const dt = new Date(d+'T00:00:00');
@@ -1135,11 +1141,13 @@ function render(){
       ['gastos','Gastos e Inversiones'],
       ['cobros','Cobros'],
       ['cajas','Cajas'],
-      ['reportes','Reportes'],
     ]},
     { id: 'catalogo', label: 'Catálogo', icon: '◇', tabs: [
       ['recetario','Recetario'],
       ['insumos','Inventario'],
+    ]},
+    { id: 'reportes', label: 'Reportes', icon: '▦', tabs: [
+      ['reportes','Reportes'],
     ]},
     { id: 'sistema', label: 'Sistema', icon: '⚙', tabs: [
       ['actividad','Actividad'],
@@ -1299,10 +1307,13 @@ function renderCalendario(){
   const proximoEvento = upcomingEventos[0] || null;
   const pendienteCobroTotal = state.eventos.filter(ev=>ev.estado==='reservado').reduce((s,ev)=>s+Math.max(0, saldoPendienteEvento(ev)), 0);
 
+  const prodPagados = state.produccion.filter(p=>p.pagado).length;
+  const prodPendientes = state.produccion.length - prodPagados;
+
   return `
     ${adminUnlocked ? `
     <div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
-      <div class="card featured" style="margin-bottom:0;">
+      <div class="card featured clickable" data-goto-tab="eventos" style="margin-bottom:0;">
         <div class="section-hint" style="margin-top:0;">Próximo evento</div>
         ${proximoEvento ? `
           <div style="display:flex; align-items:center; gap:12px; margin-top:6px;">
@@ -1314,7 +1325,7 @@ function renderCalendario(){
           </div>
         ` : '<div class="d" style="margin-top:6px;">No hay eventos próximos.</div>'}
       </div>
-      <div class="card featured" style="margin-bottom:0;">
+      <div class="card featured clickable" data-goto-tab="cobros" style="margin-bottom:0;">
         <div class="section-hint" style="margin-top:0;">Pendiente de cobro</div>
         <div style="font-family:'Fraunces',serif; font-size:1.6rem; color:var(--gold); margin-top:4px;">${fmtMoney(pendienteCobroTotal)}</div>
         <div class="section-hint" style="margin-top:2px;">Eventos reservados sin cobrar o cobrados parcialmente</div>
@@ -1323,10 +1334,14 @@ function renderCalendario(){
     <div style="height:14px;"></div>
     ` : ''}
     <div class="grid-cards">
-      <div class="stat"><div class="k">Eventos reservados</div><div class="v">${totalReservados}</div></div>
-      <div class="stat"><div class="k">Eventos posibles</div><div class="v sage">${totalPosibles}</div></div>
-      <div class="stat"><div class="k">Degustaciones agendadas</div><div class="v">${state.eventos.filter(e=>e.degustacionFecha).length}</div></div>
-      <div class="stat"><div class="k">Días de producción/limpieza</div><div class="v">${state.produccion.length}</div></div>
+      <div class="stat clickable" data-goto-tab="eventos"><div class="k">Eventos reservados</div><div class="v">${totalReservados}</div></div>
+      <div class="stat clickable" data-goto-tab="eventos"><div class="k">Eventos posibles</div><div class="v sage">${totalPosibles}</div></div>
+      <div class="stat clickable" data-goto-tab="degustaciones"><div class="k">Degustaciones agendadas</div><div class="v">${state.eventos.filter(e=>e.degustacionFecha).length}</div></div>
+      <div class="stat clickable" data-goto-tab="produccion">
+        <div class="k">Días de producción/limpieza</div>
+        <div class="v">${state.produccion.length}</div>
+        <div style="font-size:0.72rem; margin-top:4px;"><span style="color:var(--sage);">${prodPagados} pagados</span> · <span style="color:var(--gold);">${prodPendientes} pendientes</span></div>
+      </div>
     </div>
     ${adminUnlocked && state.cajas.length>0 ? `
     <div class="card">
@@ -1336,17 +1351,17 @@ function renderCalendario(){
           const saldo = saldoCaja(c.id);
           const egresos = egresosTotalesCaja(c.id);
           return `
-          <div class="stat">
+          <div class="stat clickable" data-goto-tab="cajas">
             <div class="k">${c.nombre}</div>
             <div class="v" style="color:${saldo>=0?'var(--sage)':'var(--red)'}; font-size:1.2rem;">${fmtMoney(saldo)}</div>
             <div style="font-size:0.72rem; color:var(--cream-dim); margin-top:4px;">Gastado: ${fmtMoney(egresos)}</div>
           </div>
         `;}).join('')}
-        <div class="stat">
+        <div class="stat clickable" data-goto-tab="pagos">
           <div class="k">Reembolsos pendientes</div>
           <div class="v" style="color:var(--gold); font-size:1.2rem;">${fmtMoney(sumaWhere(state.gastosPersonal, g=>!g.pagado))}</div>
         </div>
-        <div class="stat">
+        <div class="stat clickable" data-goto-tab="cobros">
           <div class="k">Pendiente de cobro</div>
           <div class="v" style="color:var(--gold); font-size:1.2rem;">${fmtMoney(state.eventos.filter(ev=>ev.estado==='reservado').reduce((s,ev)=>s+Math.max(0, saldoPendienteEvento(ev)), 0))}</div>
           <div style="font-size:0.72rem; color:var(--cream-dim); margin-top:4px;">Montos de eventos reservados sin cobrar o cobrados parcialmente (no incluye posibles)</div>
@@ -2112,7 +2127,7 @@ function openCobroModal(id){
     bodyHtml: cobroFormFields(c),
     onSave: (form)=>{
       const data = {
-        eventoId: form.eventoId.value, fecha: form.fecha.value, monto: form.monto.value,
+        eventoId: form.eventoId.value, fecha: form.fecha.value, monto: parseMonto(form.monto.value),
         tipo: form.tipo.value, descripcion: form.descripcion.value.trim(),
         cajaId: form.cajaId.value, adminId: c ? c.adminId : adminUnlocked.id,
       };
@@ -3202,7 +3217,7 @@ function parseWorkerText(texto){
       let monto = 0;
       parts.slice(3).forEach(p=>{
         const idx = p.indexOf('=');
-        if(idx>-1 && p.slice(0,idx).trim()==='monto') monto = Number(p.slice(idx+1).trim())||0;
+        if(idx>-1 && p.slice(0,idx).trim()==='monto') monto = parseMonto(p.slice(idx+1).trim());
       });
       gastos.push({ fecha: parts[1], descripcion: parts[2]||'', monto });
       return;
@@ -3373,7 +3388,7 @@ function openCompraModal(id){
     bodyHtml: compraFormFields(c),
     onSave: (form)=>{
       const data = {
-        eventoId: form.eventoId.value, fecha: form.fecha.value, monto: form.monto.value,
+        eventoId: form.eventoId.value, fecha: form.fecha.value, monto: parseMonto(form.monto.value),
         descripcion: form.descripcion.value.trim(), categoria: form.categoria.value.trim(),
         cajaId: form.cajaId.value, adminId: c ? c.adminId : adminUnlocked.id,
       };
@@ -3541,7 +3556,7 @@ function openGastoModal(id){
         tipo: form.tipo.value,
         eventoId: form.tipo.value==='evento' ? form.eventoId.value : null,
         movimiento: form.movimiento.value, cajaId: form.cajaId.value,
-        fecha: form.fecha.value, monto: form.monto.value,
+        fecha: form.fecha.value, monto: parseMonto(form.monto.value),
         categoria: form.categoria.value.trim(), descripcion: form.descripcion.value.trim(),
         adminId: g ? g.adminId : adminUnlocked.id,
       };
@@ -3897,7 +3912,7 @@ function openPagoModal(id){
     onSave: (form)=>{
       const data = {
         personaId: form.personaId.value, eventoId: form.eventoId.value || null,
-        fecha: form.fecha.value, monto: form.monto.value, descripcion: form.descripcion.value.trim(),
+        fecha: form.fecha.value, monto: parseMonto(form.monto.value), descripcion: form.descripcion.value.trim(),
         cajaId: form.cajaId.value, adminId: p ? p.adminId : adminUnlocked.id,
       };
       const perNombre = (personaDe(data.personaId)||{}).nombre || '(persona eliminada)';
@@ -4169,10 +4184,23 @@ function resumenPorAdmin(mesFiltro){
     const cargadoIngresos = ingresosGastos + ingresosCobros;
     const cargadoEgresos = egresosGastosVarios + egresosCompras + egresosPagosPersonal;
     const cajasPropias = state.cajas.filter(c=>c.administradorId===a.id);
+
+    const categorias = {};
+    state.gastos.filter(g=>g.adminId===a.id && g.movimiento==='egreso' && enMes(g.fecha)).forEach(g=>{
+      const cat = g.categoria || 'Gasto sin categoría';
+      categorias[cat] = (categorias[cat]||0) + (Number(g.monto)||0);
+    });
+    state.compras.filter(c=>c.adminId===a.id && enMes(c.fecha)).forEach(c=>{
+      const cat = c.categoria ? `Compra: ${c.categoria}` : 'Compra sin categoría';
+      categorias[cat] = (categorias[cat]||0) + (Number(c.monto)||0);
+    });
+    if(egresosPagosPersonal>0) categorias['Pagos a personal'] = (categorias['Pagos a personal']||0) + egresosPagosPersonal;
+
     return {
       admin: a,
       cargadoIngresos, cargadoEgresos, cargadoNeto: cargadoIngresos - cargadoEgresos,
       egresosDetalle: { compras: egresosCompras, gastos: egresosGastosVarios, pagosPersonal: egresosPagosPersonal },
+      categorias: Object.entries(categorias).sort((a,b)=>b[1]-a[1]),
       cajas: cajasPropias.map(c=>({ nombre: c.nombre, saldo: saldoCaja(c.id) })),
     };
   });
@@ -4234,6 +4262,14 @@ function renderReportes(){
             <div style="display:flex; justify-content:space-between;"><span>Gastos e inversiones</span><span class="mono">${fmtMoney(r.egresosDetalle.gastos)}</span></div>
             <div style="display:flex; justify-content:space-between;"><span>Pagos a personal</span><span class="mono">${fmtMoney(r.egresosDetalle.pagosPersonal)}</span></div>
           </div>
+          ${r.categorias.length>0 ? `
+          <details style="margin-bottom:10px;">
+            <summary style="cursor:pointer; color:var(--cream-dim); font-size:0.78rem;">Ver por categoría (${r.categorias.length})</summary>
+            <div style="display:flex; flex-direction:column; gap:3px; font-size:0.8rem; margin-top:8px;">
+              ${r.categorias.map(([cat,monto])=>`<div style="display:flex; justify-content:space-between;"><span>${cat}</span><span class="mono">${fmtMoney(monto)}</span></div>`).join('')}
+            </div>
+          </details>
+          ` : ''}
           ${r.cajas.length>0 ? `
           <div class="section-hint" style="margin-bottom:4px;">Su/s caja/s</div>
           ${r.cajas.map(c=>`<div style="display:flex; justify-content:space-between; font-size:0.85rem;"><span>${c.nombre}</span><span class="mono" style="color:${c.saldo>=0?'var(--sage)':'var(--red)'};">${fmtMoney(c.saldo)}</span></div>`).join('')}
