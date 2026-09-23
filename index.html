@@ -20,6 +20,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 /** @license
  *
@@ -763,6 +764,11 @@ new MutationObserver(()=>{
 document.addEventListener('click', function(e){
   const el = e.target.closest('[data-goto-tab]');
   if(el){ currentTab = el.dataset.gotoTab; render(); }
+  const pdfBtn = e.target.closest('[data-descargar-pdf-insumos]');
+  if(pdfBtn){
+    const ev = state.eventos.find(x=>x.id===pdfBtn.dataset.descargarPdfInsumos);
+    if(ev) generarPdfInsumosEvento(ev);
+  }
 });
 function fmtDate(d){
   if(!d) return '—';
@@ -781,16 +787,76 @@ function comprobantePagoTexto(pago){
   txt += `Monto: ${fmtMoney(pago.monto)}\n`;
   return txt;
 }
+function nombreActorActual(){
+  return adminUnlocked ? adminUnlocked.nombre : (colaboradorLimitadoUnlocked ? colaboradorLimitadoUnlocked.nombre : 'Sistema');
+}
+function generarPdfInsumosEvento(ev){
+  if(typeof window.jspdf === 'undefined'){ alert('No se pudo cargar el generador de PDF. Probá recargar la página.'); return; }
+  const movs = state.movimientosInsumo.filter(m=>m.eventoId===ev.id);
+  const neto = {};
+  movs.forEach(m=>{ neto[m.insumoId] = (neto[m.insumoId]||0) + (m.tipo==='salida'?1:-1)*(Number(m.cantidad)||0); });
+  const items = Object.entries(neto).filter(([,cant])=>cant>0).map(([insumoId,cant])=>{
+    const ins = state.insumos.find(i=>i.id===insumoId);
+    return { nombre: ins?ins.nombre:'(ítem eliminado)', unidad: ins&&ins.unidad?ins.unidad:'', cantidad: cant };
+  });
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('p','pt','a4');
+  const pageW = doc.internal.pageSize.getWidth();
+  const VERDE_RGB = [24,40,24];
+  const marginL = 55;
+  let y = 60;
+
+  doc.setFillColor(...VERDE_RGB); doc.rect(0,0,pageW,90,'F');
+  doc.setTextColor(243,237,224);
+  doc.setFont('times','bold'); doc.setFontSize(20);
+  doc.text('BLEND', marginL, 45);
+  doc.setFont('times','normal'); doc.setFontSize(10);
+  doc.text('Lista de ítems y herramientas', marginL, 65);
+
+  y = 120;
+  doc.setTextColor(30,30,30);
+  doc.setFont('times','bold'); doc.setFontSize(13);
+  doc.text(`Evento: ${ev.lugar||'(sin lugar)'}`, marginL, y);
+  y += 20;
+  doc.setFont('times','normal'); doc.setFontSize(11);
+  doc.text(`Fecha: ${fmtDate(ev.fecha)}`, marginL, y);
+  y += 30;
+
+  doc.setFont('times','italic'); doc.setFontSize(10); doc.setTextColor(90,90,90);
+  doc.splitTextToSize('Se envía lo siguiente. Por favor confirmar qué vuelve al terminar (botellas cerradas cuentan entero, abiertas por la parte que sobra).', pageW-marginL*2).forEach(l=>{ doc.text(l, marginL, y); y+=14; });
+  y += 16;
+
+  doc.setDrawColor(...VERDE_RGB);
+  doc.setFont('times','bold'); doc.setFontSize(11); doc.setTextColor(...VERDE_RGB);
+  doc.text('Ítem', marginL, y);
+  doc.text('Cantidad', pageW-marginL-60, y);
+  y += 6;
+  doc.line(marginL, y, pageW-marginL, y);
+  y += 18;
+
+  doc.setFont('times','normal'); doc.setFontSize(11); doc.setTextColor(30,30,30);
+  if(items.length===0){
+    doc.text('(sin ítems registrados todavía)', marginL, y);
+  } else {
+    items.forEach(it=>{
+      doc.text(`${it.nombre}${it.unidad?' ('+it.unidad+')':''}`, marginL, y);
+      doc.text(String(it.cantidad), pageW-marginL-60, y);
+      y += 20;
+    });
+  }
+
+  doc.save(`blend-items-${(ev.lugar||'evento').replace(/[^a-z0-9]+/gi,'-').toLowerCase()}.pdf`);
+}
 function textoEnvioInsumosEvento(ev){
   const movs = state.movimientosInsumo.filter(m=>m.eventoId===ev.id);
   const neto = {};
   movs.forEach(m=>{ neto[m.insumoId] = (neto[m.insumoId]||0) + (m.tipo==='salida'?1:-1)*(Number(m.cantidad)||0); });
-  let txt = `📦 BLEND — Lista de insumos y herramientas\\n`;
+  let txt = `📦 BLEND — Lista de ítems y herramientas\\n`;
   txt += `Evento: ${ev.lugar||'(sin lugar)'} — ${fmtDate(ev.fecha)}\\n\\n`;
   txt += `Se envía lo siguiente. Por favor confirmar qué vuelve al terminar (botellas cerradas cuentan entero, abiertas por la parte que sobra):\\n\\n`;
   Object.entries(neto).filter(([,cant])=>cant>0).forEach(([insumoId,cant])=>{
     const ins = state.insumos.find(i=>i.id===insumoId);
-    txt += `• ${ins?ins.nombre:'(insumo eliminado)'}${ins&&ins.unidad?' ('+ins.unidad+')':''}: ${cant}\\n`;
+    txt += `• ${ins?ins.nombre:'(ítem eliminado)'}${ins&&ins.unidad?' ('+ins.unidad+')':''}: ${cant}\\n`;
   });
   return txt;
 }
@@ -854,6 +920,7 @@ async function loadState(){
       state.kits = parsed.kits || [];
       migrarProduccionAntigua();
       migrarRecetarioNuevosTragos();
+      state.insumos.forEach(ins=>{ if(!ins.tipo) ins.tipo = 'herramienta'; });
     }
     storageOk = true;
   }catch(e){
@@ -957,30 +1024,33 @@ const RECARGO_MENOS_HORAS = 1.20; // menos de 6h: prorrateo + 20%
 const RECARGO_HORA_ADICIONAL_UNITARIA = 1.10; // (total/horas) * 1.10
 const DESCUENTO_PAQUETE_MAS_HORAS = 0.95; // 5% menos que pagar horas sueltas
 
+function redondearArribaMil(monto){
+  return Math.ceil(monto/1000)*1000;
+}
 function precioPorPersonaBase(personas){
-  return Math.round(interpolar(personas, TABLA_PRECIO_PERSONA));
+  return redondearArribaMil(interpolar(personas, TABLA_PRECIO_PERSONA));
 }
 function precioPorTrago(cantidadTragos){
-  return Math.round(interpolar(cantidadTragos, TABLA_PRECIO_TRAGO));
+  return redondearArribaMil(interpolar(cantidadTragos, TABLA_PRECIO_TRAGO));
 }
 function horaAdicionalUnitaria(totalPaquete, horasPaquete){
   if(!horasPaquete) return 0;
-  return Math.round((totalPaquete/horasPaquete) * RECARGO_HORA_ADICIONAL_UNITARIA);
+  return redondearArribaMil((totalPaquete/horasPaquete) * RECARGO_HORA_ADICIONAL_UNITARIA);
 }
 function calcularBarraLibrePorHoras(personas, horas){
   const precioBase = precioPorPersonaBase(personas);
   const total6h = personas * precioBase;
   if(!horas || horas===HORAS_BASE_POLITICA) return total6h;
   if(horas < HORAS_BASE_POLITICA){
-    return Math.round((total6h / HORAS_BASE_POLITICA * horas) * RECARGO_MENOS_HORAS);
+    return redondearArribaMil((total6h / HORAS_BASE_POLITICA * horas) * RECARGO_MENOS_HORAS);
   }
   const horasExtra = horas - HORAS_BASE_POLITICA;
   const unitHoraExtra = horaAdicionalUnitaria(total6h, HORAS_BASE_POLITICA);
-  return Math.round((total6h + horasExtra*unitHoraExtra) * DESCUENTO_PAQUETE_MAS_HORAS);
+  return redondearArribaMil((total6h + horasExtra*unitHoraExtra) * DESCUENTO_PAQUETE_MAS_HORAS);
 }
 function precioPorPersonaSegunHoras(personas, horas){
   if(!personas) return precioPorPersonaBase(100);
-  return Math.round(calcularBarraLibrePorHoras(personas, horas) / personas);
+  return redondearArribaMil(calcularBarraLibrePorHoras(personas, horas) / personas);
 }
 function opcionesTragosRecomendadas(personas){
   return [1,2,3].map(mult=>{
@@ -1124,9 +1194,9 @@ async function archivarDatosViejos(manual){
   state.log = logConservar;
   state.movimientosInsumo = movConservar;
   state.ultimoArchivadoTs = Date.now();
-  pushLog(adminUnlocked ? adminUnlocked.nombre : 'Sistema', 'Archivado automático', `${logArchivar.length} del log, ${movArchivar.length} movimiento(s) de insumo — más de ${ARCHIVO_ANTIGUEDAD_DIAS} días`);
+  pushLog(adminUnlocked ? adminUnlocked.nombre : 'Sistema', 'Archivado automático', `${logArchivar.length} del log, ${movArchivar.length} movimiento(s) de ítem — más de ${ARCHIVO_ANTIGUEDAD_DIAS} días`);
   saveState();
-  if(manual){ alert(`Se archivaron ${logArchivar.length} registros de actividad y ${movArchivar.length} movimientos de insumo de más de un año. El stock actual no cambió.`); render(); }
+  if(manual){ alert(`Se archivaron ${logArchivar.length} registros de actividad y ${movArchivar.length} movimientos de ítem de más de un año. El stock actual no cambió.`); render(); }
 }
 function personasEnConflicto(fecha, eventoIdActual){
   // devuelve {personaId: [nombresDeEventos]} para personas asignadas a más de un evento la misma fecha
@@ -1254,6 +1324,7 @@ function render(){
     ]},
     { id: 'eventos', label: 'Eventos', icon: '▤', tabs: [
       ['eventos','Eventos'],
+      ['armar-eventos','Armar Eventos'],
       ['degustaciones','Degustaciones / Planners'],
       ['disponibilidad','Disponibilidad'],
       ['presupuestos','Presupuestos'],
@@ -1363,6 +1434,7 @@ function renderPanel(){
   const renderers = {
     calendario: renderCalendario,
     eventos: renderEventos,
+    'armar-eventos': renderArmarEventos,
     cobros: renderCobros,
     degustaciones: renderDegustaciones,
     recetario: renderRecetario,
@@ -1379,7 +1451,7 @@ function renderPanel(){
     actividad: renderActividad,
     administradores: renderAdministradores,
   };
-  const adminOnly = new Set(['eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','gastos','cajas','pagos','reportes','actividad','administradores']);
+  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','gastos','cajas','pagos','reportes','actividad','administradores']);
   if(adminOnly.has(currentTab) && !adminUnlocked){
     panel.innerHTML = `<div class="empty">Necesitás ingresar como administrador para ver esta sección.</div>`;
     return;
@@ -1925,7 +1997,7 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
             const ins = state.insumos.find(i=>i.id===insumoId);
             const descripcion = tipo==='entrada' ? `Devolución del evento: ${ev.lugar||''}` : `Consumo en evento: ${ev.lugar||''}`;
             state.movimientosInsumo.push({id:uid(), insumoId, tipo, cantidad, fecha: todayStr(), eventoId: ev.id, descripcion});
-            pushLog(adminUnlocked.nombre, tipo==='entrada' ? 'Devolución de insumo registrada' : 'Consumo de insumo registrado', `${ins?ins.nombre:''} ${tipo==='entrada'?'+':'-'}${cantidad} — ${ev.lugar||'(sin lugar)'}`);
+            pushLog(adminUnlocked.nombre, tipo==='entrada' ? 'Devolución de ítem registrada' : 'Consumo de ítem registrado', `${ins?ins.nombre:''} ${tipo==='entrada'?'+':'-'}${cantidad} — ${ev.lugar||'(sin lugar)'}`);
             saveState(); closeModal(); render();
           });
         }
@@ -2209,7 +2281,7 @@ function eventoDetailExtra(ev){
 
     ${state.insumos.length>0 ? `
     <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
-      <h3 style="font-size:0.95rem; margin:0 0 8px;">Insumos: envío y devolución</h3>
+      <h3 style="font-size:0.95rem; margin:0 0 8px;">Ítems: envío y devolución</h3>
       <div class="section-hint" style="margin-top:-4px; margin-bottom:8px;">Registrá lo que sale para el evento, y cuando vuelva (botellas cerradas o parte de una abierta) registrá la devolución — el stock se ajusta solo con la diferencia real.</div>
       ${consumosDelEvento.length>0 ? `
       <div class="list-simple" style="margin-bottom:10px;">
@@ -2241,13 +2313,13 @@ function eventoDetailExtra(ev){
             <option value="entrada">Volvió del evento (devolución)</option>
           </select>
         </div>
-        <div class="field" style="margin-bottom:0;"><label>Insumo</label>
+        <div class="field" style="margin-bottom:0;"><label>Ítem</label>
           <select name="insumoId">${state.insumos.map(i=>`<option value="${i.id}">${i.nombre} (stock: ${stockInsumo(i.id)})</option>`).join('')}</select>
         </div>
         <div class="field" style="margin-bottom:0;"><label>Cantidad</label><input type="number" step="0.1" name="cantidad" placeholder="Ej: 2.5"></div>
       </div>
       <button type="button" class="btn small" id="btnAgregarConsumo" style="margin-top:8px;">+ Registrar movimiento</button>
-      ${consumosDelEvento.some(m=>m.tipo==='salida') ? `<a class="btn small ghost" style="margin-top:8px; margin-left:8px;" href="${waLink(textoEnvioInsumosEvento(ev))}" target="_blank" rel="noopener">Compartir lista con el encargado</a>` : ''}
+      ${consumosDelEvento.some(m=>m.tipo==='salida') ? `<a class="btn small ghost" style="margin-top:8px; margin-left:8px;" href="${waLink(textoEnvioInsumosEvento(ev))}" target="_blank" rel="noopener">Compartir lista con el encargado</a><button type="button" class="btn small ghost" style="margin-top:8px; margin-left:8px;" data-descargar-pdf-insumos="${ev.id}">Descargar PDF</button>` : ''}
     </div>` : ''}
   `;
 }
@@ -3680,11 +3752,11 @@ function compraFormFields(c){
     <div class="field"><label>Caja de donde sale el dinero</label>
       <select name="cajaId">${cajasDisponibles().map(cc=>`<option value="${cc.id}" ${(c.cajaId||cajaSugerida)===cc.id?'selected':''}>${cc.nombre}</option>`).join('')}</select>
     </div>
-    <div class="field"><label>Descripción</label><input type="text" name="descripcion" value="${c.descripcion||''}" placeholder="Insumos, hielo, decoración…"></div>
+    <div class="field"><label>Descripción</label><input type="text" name="descripcion" value="${c.descripcion||''}" placeholder="Ítems, hielo, decoración…"></div>
     <div class="field"><label>Categoría (opcional)</label><input type="text" name="categoria" value="${c.categoria||''}"></div>
     ${state.insumos.length>0 ? `
     <div class="field-row">
-      <div class="field"><label>¿Suma stock de un insumo? (opcional)</label>
+      <div class="field"><label>¿Suma stock de un ítem? (opcional)</label>
         <select name="insumoId"><option value="">— No —</option>${state.insumos.map(i=>`<option value="${i.id}" ${c.insumoId===i.id?'selected':''}>${i.nombre}</option>`).join('')}</select>
       </div>
       <div class="field"><label>Cantidad que ingresa</label><input type="number" name="insumoCantidad" value="${c.insumoCantidad||''}"></div>
@@ -3724,21 +3796,159 @@ function openCompraModal(id){
 }
 
 // ================= INVENTARIO DE INSUMOS =================
-function renderInsumos(){
-  const rows = state.insumos;
+let armarEventoSeleccionadoId = null;
+function renderArmarEventos(){
+  const eventosOrdenados = state.eventos.slice().sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  const ev = armarEventoSeleccionadoId ? state.eventos.find(e=>e.id===armarEventoSeleccionadoId) : null;
   return `
     <div class="row-between">
-      <div><h2 class="section-title">Inventario</h2><div class="section-hint">Stock de insumos generales (bebidas, hielo, vasos, herramientas, etc.) — sube con las compras, baja con lo que se consume en cada evento.</div></div>
-      <button class="btn" id="btnNuevoInsumo">+ Nuevo insumo</button>
+      <div><h2 class="section-title">Armar Eventos</h2><div class="section-hint">Elegí un evento o degustación ya cargado y asigná todo lo que se lleva (herramientas, insumos, botellas). Al final, compartís la lista con el encargado por WhatsApp.</div></div>
     </div>
-    ${rows.length===0 ? '<div class="empty">Todavía no cargaste insumos.</div>' : `
+    <div class="field" style="max-width:520px;">
+      <label>Evento</label>
+      <select id="armarEventoSelect">
+        <option value="">— Elegí un evento —</option>
+        ${eventosOrdenados.map(e=>`<option value="${e.id}" ${armarEventoSeleccionadoId===e.id?'selected':''}>${fmtDate(e.fecha)} — ${e.lugar||'(sin lugar)'} (${e.estado}${e.degustacionFecha?' · degustación':''})</option>`).join('')}
+      </select>
+    </div>
+    ${ev ? armarEventoBloqueHtml(ev) : '<div class="empty" style="margin-top:14px;">Elegí un evento arriba para empezar a cargar lo que se lleva.</div>'}
+  `;
+}
+function armarEventoBloqueHtml(ev){
+  if(state.insumos.length===0) return '<div class="empty" style="margin-top:14px;">Todavía no cargaste ítems en el Inventario.</div>';
+  const consumosDelEvento = state.movimientosInsumo.filter(m=>m.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
+  return `
+    <div class="card" style="margin-top:16px;">
+      <div style="font-family:'Fraunces',serif; font-size:1.1rem; margin-bottom:10px;">${ev.lugar||'(sin lugar)'} — ${fmtDate(ev.fecha)}</div>
+      ${consumosDelEvento.length>0 ? `
+      <div class="list-simple" style="margin-bottom:10px;">
+        ${consumosDelEvento.map(m=>{ const ins = state.insumos.find(x=>x.id===m.insumoId); const esSalida = m.tipo==='salida'; return `<div class="li"><div class="t">${ins?ins.nombre:'(ítem eliminado)'} <span class="badge ${esSalida?'senado':'posible'}">${esSalida?'salió':'volvió'}</span></div><div class="mono" style="color:${esSalida?'var(--red)':'var(--sage)'};">${esSalida?'-':'+'}${m.cantidad}</div></div>`; }).join('')}
+      </div>
+      <div class="section-hint" style="margin-bottom:10px;">Consumo neto por ítem: ${(()=>{ const neto={}; consumosDelEvento.forEach(m=>{ neto[m.insumoId]=(neto[m.insumoId]||0)+(m.tipo==='salida'?1:-1)*(Number(m.cantidad)||0); }); return Object.entries(neto).map(([id,n])=>{ const ins=state.insumos.find(x=>x.id===id); return `${ins?ins.nombre:'—'}: ${n}`; }).join(' · ') || '—'; })()}</div>
+      ` : '<div class="d" style="margin-bottom:10px;">Sin movimientos registrados todavía.</div>'}
+
+      ${state.kits.length>0 ? `
+      <div style="background:var(--ink-3); border-radius:10px; padding:12px; margin-bottom:14px;">
+        <div class="section-hint" style="margin-top:0; margin-bottom:8px;">Aplicar kit (multiplica sus cantidades y registra todo junto)</div>
+        <div class="field-row" id="armarKitForm" style="align-items:flex-end; margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;"><label>Kit</label>
+            <select id="armarKitSelect">${state.kits.map(k=>`<option value="${k.id}">${k.nombre}</option>`).join('')}</select>
+          </div>
+          <div class="field" style="margin-bottom:0; flex:0 0 90px;"><label>Cantidad</label><input type="number" id="armarKitCantidad" value="1"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+          <button type="button" class="btn small" id="btnArmarAplicarKitSalida">Registrar envío del kit</button>
+          <button type="button" class="btn small ghost" id="btnArmarAplicarKitEntrada">Registrar devolución del kit</button>
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="field-row" id="armarConsumoForm" style="align-items:flex-end;">
+        <div class="field" style="margin-bottom:0;"><label>Movimiento</label>
+          <select id="armarTipoMovimiento">
+            <option value="salida">Salió para el evento</option>
+            <option value="entrada">Volvió del evento (devolución)</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;"><label>Ítem</label>
+          <select id="armarInsumoId">${state.insumos.map(i=>`<option value="${i.id}">${i.nombre} (stock: ${stockInsumo(i.id)})</option>`).join('')}</select>
+        </div>
+        <div class="field" style="margin-bottom:0;"><label>Cantidad</label><input type="number" step="0.1" id="armarCantidad" placeholder="Ej: 2.5"></div>
+      </div>
+      <button type="button" class="btn small" id="btnArmarRegistrarMovimiento" style="margin-top:8px;">+ Registrar movimiento</button>
+      ${consumosDelEvento.some(m=>m.tipo==='salida') ? `<a class="btn small ghost" style="margin-top:8px; margin-left:8px;" href="${waLink(textoEnvioInsumosEvento(ev))}" target="_blank" rel="noopener">Compartir lista con el encargado</a><button type="button" class="btn small ghost" style="margin-top:8px; margin-left:8px;" data-descargar-pdf-insumos="${ev.id}">Descargar PDF</button>` : ''}
+    </div>
+  `;
+}
+function bindArmarEventos(){
+  const sel = document.getElementById('armarEventoSelect');
+  if(!sel) return;
+  sel.addEventListener('change', ()=>{
+    armarEventoSeleccionadoId = sel.value || null;
+    if(appMode==='colaborador') renderColaboradorPanel(); else render();
+  });
+  const ev = armarEventoSeleccionadoId ? state.eventos.find(e=>e.id===armarEventoSeleccionadoId) : null;
+  if(!ev) return;
+
+  const btnMov = document.getElementById('btnArmarRegistrarMovimiento');
+  if(btnMov) btnMov.addEventListener('click', ()=>{
+    const insumoId = document.getElementById('armarInsumoId').value;
+    const cantidad = document.getElementById('armarCantidad').value;
+    const tipo = document.getElementById('armarTipoMovimiento').value;
+    if(!insumoId || !cantidad) return;
+    const ins = state.insumos.find(i=>i.id===insumoId);
+    const descripcion = tipo==='entrada' ? `Devolución del evento: ${ev.lugar||''}` : `Consumo en evento: ${ev.lugar||''}`;
+    state.movimientosInsumo.push({id:uid(), insumoId, tipo, cantidad, fecha: todayStr(), eventoId: ev.id, descripcion});
+    pushLog(nombreActorActual(), tipo==='entrada' ? 'Devolución de ítem registrada' : 'Consumo de ítem registrado', `${ins?ins.nombre:''} ${tipo==='entrada'?'+':'-'}${cantidad} — ${ev.lugar||'(sin lugar)'}`);
+    saveState();
+    if(appMode==='colaborador') renderColaboradorPanel(); else render();
+  });
+
+  function aplicarKitArmar(tipo){
+    const kitSelect = document.getElementById('armarKitSelect');
+    const kitCantidad = document.getElementById('armarKitCantidad');
+    if(!kitSelect) return;
+    const kit = state.kits.find(k=>k.id===kitSelect.value);
+    if(!kit) return;
+    const mult = Number(kitCantidad.value)||0;
+    if(mult<=0) return alert('Ingresá una cantidad mayor a 0.');
+    if(kit.items.length===0) return alert('Ese kit no tiene ítems cargados.');
+    const descripcion = tipo==='entrada'
+      ? `Devolución del evento: ${ev.lugar||''} — kit "${kit.nombre}" x${mult}`
+      : `Consumo en evento: ${ev.lugar||''} — kit "${kit.nombre}" x${mult}`;
+    kit.items.forEach(it=>{
+      state.movimientosInsumo.push({id:uid(), insumoId: it.insumoId, tipo, cantidad: it.cantidad*mult, fecha: todayStr(), eventoId: ev.id, descripcion});
+    });
+    pushLog(nombreActorActual(), tipo==='entrada' ? 'Devolución de kit registrada' : 'Envío de kit registrado', `${kit.nombre} x${mult} — ${ev.lugar||'(sin lugar)'}`);
+    saveState();
+    if(appMode==='colaborador') renderColaboradorPanel(); else render();
+  }
+  const btnKitSalida = document.getElementById('btnArmarAplicarKitSalida');
+  if(btnKitSalida) btnKitSalida.addEventListener('click', ()=>aplicarKitArmar('salida'));
+  const btnKitEntrada = document.getElementById('btnArmarAplicarKitEntrada');
+  if(btnKitEntrada) btnKitEntrada.addEventListener('click', ()=>aplicarKitArmar('entrada'));
+}
+function herramientasSinDevolver(){
+  const grupos = {};
+  state.movimientosInsumo.forEach(m=>{
+    if(!m.eventoId) return;
+    const ins = state.insumos.find(i=>i.id===m.insumoId);
+    if(!ins || ins.tipo!=='herramienta') return;
+    const key = m.eventoId+'|'+m.insumoId;
+    grupos[key] = (grupos[key]||0) + (m.tipo==='salida'?1:-1)*(Number(m.cantidad)||0);
+  });
+  return Object.entries(grupos).filter(([,neto])=>neto>0).map(([key,neto])=>{
+    const [eventoId, insumoId] = key.split('|');
+    return { evento: state.eventos.find(e=>e.id===eventoId), insumo: state.insumos.find(i=>i.id===insumoId), cantidad: neto };
+  }).filter(x=>x.insumo);
+}
+function renderInsumos(){
+  const rows = state.insumos;
+  const pendientes = herramientasSinDevolver();
+  return `
+    <div class="row-between">
+      <div><h2 class="section-title">Inventario</h2><div class="section-hint">Stock de ítems generales (bebidas, hielo, vasos, herramientas, etc.) — sube con las compras, baja con lo que se consume en cada evento.</div></div>
+      <button class="btn" id="btnNuevoInsumo">+ Nuevo ítem</button>
+    </div>
+
+    ${pendientes.length>0 ? `
+    <div class="card" style="border-color:var(--gold); margin-bottom:20px;">
+      <h3 style="margin-top:0; font-size:0.95rem;">Herramientas sin devolver</h3>
+      <div class="section-hint" style="margin-top:-6px;">Salieron a un evento y todavía no se registró que volvieron.</div>
+      <div class="list-simple" style="margin-top:10px;">
+        ${pendientes.map(p=>`<div class="li"><div class="t">${p.insumo.nombre}</div><div class="d">${p.evento?p.evento.lugar||'(sin lugar)':'(evento eliminado)'} — ${p.evento?fmtDate(p.evento.fecha):''}</div><div class="mono" style="color:var(--gold);">${p.cantidad}</div></div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    ${rows.length===0 ? '<div class="empty">Todavía no cargaste ítems.</div>' : `
     <div class="card" style="padding:0;">
     <table>
-      <thead><tr><th>Insumo</th><th>Unidad</th><th>Stock actual</th><th>Stock mínimo</th><th></th></tr></thead>
+      <thead><tr><th>Ítem</th><th>Tipo</th><th>Unidad</th><th>Stock actual</th><th>Stock mínimo</th><th></th></tr></thead>
       <tbody>
       ${rows.map(i=>{ const stock = stockInsumo(i.id); const bajo = i.stockMinimo && stock <= Number(i.stockMinimo); return `
         <tr>
           <td>${i.nombre}</td>
+          <td><span class="badge ${i.tipo==='consumible'?'senado':'posible'}">${i.tipo==='consumible'?'Consumible':'Herramienta'}</span></td>
           <td>${i.unidad||'—'}</td>
           <td class="mono" style="color:${bajo?'var(--red)':'var(--sage)'}">${stock}${bajo?' ⚠':''}</td>
           <td class="mono">${i.stockMinimo||'—'}</td>
@@ -3750,7 +3960,7 @@ function renderInsumos(){
     </div>`}
 
     <div class="row-between" style="margin-top:24px;">
-      <div><h3 style="margin:0; font-size:1rem;">Kits</h3><div class="section-hint">Combos de insumos que se mandan juntos a un evento — por ejemplo, todo lo que necesita una estación de bartender. Se multiplican por la cantidad que necesites al aplicarlos en un evento.</div></div>
+      <div><h3 style="margin:0; font-size:1rem;">Kits</h3><div class="section-hint">Combos de ítems que se mandan juntos a un evento — por ejemplo, todo lo que necesita una estación de bartender. Se multiplican por la cantidad que necesites al aplicarlos en un evento.</div></div>
       <button class="btn small" id="btnNuevoKit" ${state.insumos.length===0?'disabled':''}>+ Nuevo kit</button>
     </div>
     ${state.kits.length===0 ? '<div class="empty">Todavía no armaste ningún kit.</div>' : state.kits.map(k=>`
@@ -3776,7 +3986,7 @@ function kitFormFields(k){
       </select>
       <div class="section-hint" style="margin-top:4px;">Si elegís una función, al aplicar el kit en un evento el sistema va a sugerir la cantidad según cuántas personas con esa función estén asignadas.</div>
     </div>
-    <div class="section-hint" style="margin:14px 0 6px;">Cantidad de cada insumo que lleva UNA unidad de este kit (dejá en blanco o 0 lo que no aplique):</div>
+    <div class="section-hint" style="margin:14px 0 6px;">Cantidad de cada ítem que lleva UNA unidad de este kit (dejá en blanco o 0 lo que no aplique):</div>
     <div style="display:flex; flex-direction:column; gap:6px; max-height:320px; overflow-y:auto; padding-right:4px;">
       ${state.insumos.map(i=>`
         <div class="field-row" style="align-items:center; margin-bottom:0;">
@@ -3815,16 +4025,22 @@ function insumoFormFields(i){
       <div class="field"><label>Unidad</label><input type="text" name="unidad" value="${i.unidad||''}" placeholder="Botellas, kg, unidades…"></div>
       <div class="field"><label>Stock inicial</label><input type="number" name="stockInicial" value="${i.stockInicial||0}"></div>
     </div>
+    <div class="field"><label>Tipo</label>
+      <select name="tipo">
+        <option value="herramienta" ${(!i.tipo || i.tipo==='herramienta')?'selected':''}>Herramienta (siempre vuelve: coctelera, vaso, jigger…)</option>
+        <option value="consumible" ${i.tipo==='consumible'?'selected':''}>Consumible (se gasta: alcohol, hielo…)</option>
+      </select>
+    </div>
     <div class="field"><label>Stock mínimo (para alerta, opcional)</label><input type="number" name="stockMinimo" value="${i.stockMinimo||''}"></div>
   `;
 }
 function openInsumoModal(id){
   const i = id ? state.insumos.find(x=>x.id===id) : null;
   modalContent = {
-    title: i ? 'Editar insumo' : 'Nuevo insumo',
+    title: i ? 'Editar ítem' : 'Nuevo ítem',
     bodyHtml: insumoFormFields(i),
     onSave: (form)=>{
-      const data = { nombre: form.nombre.value.trim(), unidad: form.unidad.value.trim(), stockInicial: form.stockInicial.value, stockMinimo: form.stockMinimo.value };
+      const data = { nombre: form.nombre.value.trim(), unidad: form.unidad.value.trim(), stockInicial: form.stockInicial.value, stockMinimo: form.stockMinimo.value, tipo: form.tipo.value };
       if(!data.nombre) return alert('Ingresá un nombre.');
       if(i){ Object.assign(i, data); pushLog(adminUnlocked.nombre, 'Insumo editado', data.nombre); } else { state.insumos.push(Object.assign({id:uid()}, data)); pushLog(adminUnlocked.nombre, 'Insumo agregado', data.nombre); }
       saveState(); closeModal(); render();
@@ -4587,6 +4803,55 @@ function resumenPagosPersonal(){
   }).sort((a,b)=> (b.pagado+b.pendiente) - (a.pagado+a.pendiente));
   return { totalPagado, totalPendiente, porPersona };
 }
+function descargarReportesExcel(){
+  if(typeof XLSX === 'undefined'){ alert('No se pudo cargar el generador de Excel. Probá recargar la página.'); return; }
+  const wb = XLSX.utils.book_new();
+
+  // Hoja: Por administrador
+  const porAdmin = resumenPorAdmin(null);
+  const filasAdmin = [['Administrador','Ingresos','Egresos','Neto','Compras','Gastos varios','Pagos a personal','Su(s) caja(s) — saldo actual']];
+  porAdmin.forEach(r=>{
+    const cajasTxt = r.cajas.map(c=>`${c.nombre}: ${c.saldo}`).join(' / ') || '—';
+    filasAdmin.push([r.admin.nombre, r.cargadoIngresos, r.cargadoEgresos, r.cargadoNeto, r.egresosDetalle.compras, r.egresosDetalle.gastos, r.egresosDetalle.pagosPersonal, cajasTxt]);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasAdmin), 'Por administrador');
+
+  // Hoja: Categorías por administrador
+  const filasCat = [['Administrador','Categoría','Monto']];
+  porAdmin.forEach(r=>{ r.categorias.forEach(([cat,monto])=>{ filasCat.push([r.admin.nombre, cat, monto]); }); });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasCat), 'Categorías por admin');
+
+  // Hoja: Pago de personas
+  const pp = resumenPagosPersonal();
+  const filasPP = [['Persona','Pagado (histórico)','Pendiente ahora']];
+  pp.porPersona.forEach(p=>filasPP.push([p.nombre, p.pagado, p.pendiente]));
+  filasPP.push(['TOTAL', pp.totalPagado, pp.totalPendiente]);
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasPP), 'Pago de personas');
+
+  // Hoja: Ciclo de eventos
+  const filasCiclo = [['Evento','Fecha','Ciclo','Personal pagado','Comisión planner pagada','Saldo cliente cerrado']];
+  state.eventos.filter(e=>e.estado==='reservado').forEach(ev=>{
+    const est = estadoCicloEvento(ev);
+    filasCiclo.push([ev.lugar||'(sin lugar)', ev.fecha||'', est.cerrado?'Cerrado':'Abierto', est.personalPagado?'Sí':'No', est.tienePlanner?(est.comisionPagada?'Sí':'No'):'N/A', est.saldoCerrado?'Sí':'No']);
+  });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasCiclo), 'Ciclo de eventos');
+
+  // Hoja: Resumen mensual
+  const meses = {};
+  function ensure(m){ if(!meses[m]) meses[m] = {eventos:0, cobrado:0, ingresosCaja:0, egresosCaja:0}; return meses[m]; }
+  state.eventos.forEach(e=>{ if(e.fecha) ensure(e.fecha.slice(0,7)).eventos++; });
+  state.cobros.forEach(c=>{ if(c.fecha) ensure(c.fecha.slice(0,7)).cobrado += Number(c.monto)||0; });
+  state.gastos.forEach(g=>{
+    if(!g.fecha) return;
+    const m = ensure(g.fecha.slice(0,7));
+    if(g.movimiento==='ingreso') m.ingresosCaja += Number(g.monto)||0; else m.egresosCaja += Number(g.monto)||0;
+  });
+  const filasMes = [['Mes','Eventos','Cobrado a clientes','Ingresos de caja','Egresos de caja']];
+  Object.keys(meses).sort().forEach(m=>{ const d=meses[m]; filasMes.push([m, d.eventos, d.cobrado, d.ingresosCaja, d.egresosCaja]); });
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(filasMes), 'Resumen mensual');
+
+  XLSX.writeFile(wb, `blend-reportes-${todayStr()}.xlsx`);
+}
 function renderReportes(){
   const meses = {};
   function ensure(m){ if(!meses[m]) meses[m] = {eventos:0, cobrado:0, ingresosCaja:0, egresosCaja:0}; return meses[m]; }
@@ -4602,6 +4867,7 @@ function renderReportes(){
   return `
     <div class="row-between">
       <div><h2 class="section-title">Reportes</h2><div class="section-hint">Resumen mes a mes — eventos, cobros a clientes y movimientos de caja.</div></div>
+      <button class="btn ghost" id="btnDescargarReportes">Descargar reporte (Excel)</button>
     </div>
 
     ${porAdmin.length>0 ? `
@@ -4737,7 +5003,7 @@ function renderActividad(){
       <div><h2 class="section-title">Actividad</h2><div class="section-hint">Quién creó, editó o eliminó cada cosa — últimos ${rows.length} movimientos.</div></div>
       <button class="btn ghost small" id="btnArchivarAhora">Archivar registros de más de 1 año</button>
     </div>
-    <div class="section-hint" style="margin-top:-10px; margin-bottom:16px;">Cada vez que un administrador ingresa, el sistema revisa solo (cada 30 días) si hay actividad o movimientos de insumo de más de un año y los guarda aparte, sin borrarlos — así esto no crece para siempre. Último archivado: ${state.ultimoArchivadoTs ? new Date(state.ultimoArchivadoTs).toLocaleDateString('es-PY') : 'nunca'}.</div>
+    <div class="section-hint" style="margin-top:-10px; margin-bottom:16px;">Cada vez que un administrador ingresa, el sistema revisa solo (cada 30 días) si hay actividad o movimientos de ítem de más de un año y los guarda aparte, sin borrarlos — así esto no crece para siempre. Último archivado: ${state.ultimoArchivadoTs ? new Date(state.ultimoArchivadoTs).toLocaleDateString('es-PY') : 'nunca'}.</div>
     ${rows.length===0 ? '<div class="empty">Todavía no hay actividad registrada.</div>' : `
     <div class="card" style="padding:0;">
     <table>
@@ -4934,6 +5200,7 @@ function closeModal(){ modalContent = null; }
 // ================= bind panel-level click events =================
 function bindPanelEvents(){
   const panel = document.getElementById('panel');
+  bindArmarEventos();
 
   // calendario nav
   const prev = document.getElementById('calPrev');
@@ -4988,6 +5255,8 @@ function bindPanelEvents(){
   panel.querySelectorAll('[data-open-personal]').forEach(b=>b.addEventListener('click', ()=>openPersonalModal(b.dataset.openPersonal)));
 
   const tarifasForm = document.getElementById('tarifasForm');
+  const btnDescargarReportes = document.getElementById('btnDescargarReportes');
+  if(btnDescargarReportes) btnDescargarReportes.addEventListener('click', descargarReportesExcel);
   const btnArchivarAhora = document.getElementById('btnArchivarAhora');
   if(btnArchivarAhora) btnArchivarAhora.addEventListener('click', ()=>archivarDatosViejos(true));
 
@@ -5271,7 +5540,7 @@ function renderColaboradorLogin(){
 let colabTab = 'calendario';
 function renderColaboradorPanel(){
   const app = document.getElementById('app');
-  const tabs = [['calendario','Calendario'],['recetario','Recetario'],['misgastos','Mis gastos']];
+  const tabs = [['calendario','Calendario'],['recetario','Recetario'],['armar-eventos','Armar Eventos'],['misgastos','Mis gastos']];
   if(!tabs.find(t=>t[0]===colabTab)) colabTab = 'calendario';
   app.innerHTML = `
     <header class="top">
@@ -5293,6 +5562,7 @@ function renderColaboradorPanel(){
   const panel = document.getElementById('panel');
   if(colabTab==='calendario') panel.innerHTML = renderCalendario();
   else if(colabTab==='recetario') panel.innerHTML = renderRecetario();
+  else if(colabTab==='armar-eventos') panel.innerHTML = renderArmarEventos();
   else panel.innerHTML = renderMisGastosColaborador();
   bindPanelEvents();
   bindMisGastosColaborador();
@@ -5386,7 +5656,7 @@ function renderWorkerMode(){
     </div>
     <div class="card" style="max-width:560px; margin:0 auto 24px;">
       <h2 style="margin-top:0; font-size:1.15rem;">Cargar gasto o compra</h2>
-      <div class="section-hint" style="margin-top:-8px;">Si compraste algo para Blend (insumos, algo del evento, etc.), cargalo acá para que te lo reembolsen.</div>
+      <div class="section-hint" style="margin-top:-8px;">Si compraste algo para Blend (ítems, algo del evento, etc.), cargalo acá para que te lo reembolsen.</div>
       <form id="workerGastoForm" style="margin-top:14px;">
         <div class="field"><label>Tu nombre</label><input type="text" name="nombreGasto" value="${workerGastos.length? workerGastos[workerGastos.length-1].nombre : (workerEntries.length? workerEntries[workerEntries.length-1].nombre : '')}"></div>
         <div class="field-row">
