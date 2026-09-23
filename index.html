@@ -935,6 +935,60 @@ function tragoAdicionalPrecio(bartenders){
   if(bartenders<=1) return 2000;
   return 3000 / bartenders;
 }
+// ===== Política de precios de barra libre (definida con Ricardo) =====
+function interpolar(valor, puntos){
+  // puntos: [[x1,y1],[x2,y2],...] ordenados por x ascendente
+  if(valor<=puntos[0][0]) return puntos[0][1];
+  for(let i=0;i<puntos.length-1;i++){
+    const [x1,y1] = puntos[i], [x2,y2] = puntos[i+1];
+    if(valor<=x2){
+      if(valor<=x1) return y1;
+      const t = (valor-x1)/(x2-x1);
+      return y1 + t*(y2-y1);
+    }
+  }
+  return puntos[puntos.length-1][1]; // plano después del último punto
+}
+const TABLA_PRECIO_PERSONA = [[100,75000],[200,72500],[300,70000]];
+const TABLA_PRECIO_TRAGO = [[100,35000],[200,33000],[300,30000],[400,28000]];
+const PRECIO_TRAGO_ADICIONAL_FIJO = 35000;
+const HORAS_BASE_POLITICA = 6;
+const RECARGO_MENOS_HORAS = 1.20; // menos de 6h: prorrateo + 20%
+const RECARGO_HORA_ADICIONAL_UNITARIA = 1.10; // (total/horas) * 1.10
+const DESCUENTO_PAQUETE_MAS_HORAS = 0.95; // 5% menos que pagar horas sueltas
+
+function precioPorPersonaBase(personas){
+  return Math.round(interpolar(personas, TABLA_PRECIO_PERSONA));
+}
+function precioPorTrago(cantidadTragos){
+  return Math.round(interpolar(cantidadTragos, TABLA_PRECIO_TRAGO));
+}
+function horaAdicionalUnitaria(totalPaquete, horasPaquete){
+  if(!horasPaquete) return 0;
+  return Math.round((totalPaquete/horasPaquete) * RECARGO_HORA_ADICIONAL_UNITARIA);
+}
+function calcularBarraLibrePorHoras(personas, horas){
+  const precioBase = precioPorPersonaBase(personas);
+  const total6h = personas * precioBase;
+  if(!horas || horas===HORAS_BASE_POLITICA) return total6h;
+  if(horas < HORAS_BASE_POLITICA){
+    return Math.round((total6h / HORAS_BASE_POLITICA * horas) * RECARGO_MENOS_HORAS);
+  }
+  const horasExtra = horas - HORAS_BASE_POLITICA;
+  const unitHoraExtra = horaAdicionalUnitaria(total6h, HORAS_BASE_POLITICA);
+  return Math.round((total6h + horasExtra*unitHoraExtra) * DESCUENTO_PAQUETE_MAS_HORAS);
+}
+function precioPorPersonaSegunHoras(personas, horas){
+  if(!personas) return precioPorPersonaBase(100);
+  return Math.round(calcularBarraLibrePorHoras(personas, horas) / personas);
+}
+function opcionesTragosRecomendadas(personas){
+  return [1,2,3].map(mult=>{
+    const cantidad = personas*mult;
+    return { cantidad, precio: precioPorTrago(cantidad) };
+  });
+}
+
 function tarifaPara(persona, funcion, fueraAsuncion){
   if(persona && persona.tarifaPersonalizada) return Number(persona.tarifaPersonalizada);
   if(fueraAsuncion) return Number(state.tarifasFueraAsuncion && state.tarifasFueraAsuncion[funcion]) || Number(state.tarifas[funcion]) || 0;
@@ -2521,6 +2575,14 @@ function presupuestoFormFields(){
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Barra libre</label>
     <div class="section-hint" style="margin-top:-4px;">El precio por persona varía según el lugar y la cantidad — editalo libremente para este presupuesto.</div>
+
+    <div style="background:var(--ink-3); border-radius:10px; padding:12px; margin-bottom:14px;">
+      <div class="section-hint" style="margin-top:0; margin-bottom:8px;">Calculadora según política de precios (completa los campos de abajo — los podés seguir editando a mano después)</div>
+      <button type="button" class="btn small" id="btnAplicarPolitica">Aplicar según personas y horas</button>
+      <button type="button" class="btn small ghost" id="btnSugerirTragos" style="margin-left:8px;">Sugerir 3 opciones de tragos</button>
+      <div id="politicaAviso" class="section-hint" style="margin-top:8px; display:none;"></div>
+    </div>
+
     <div class="field-row">
       <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes" value="0"></div>
       <div class="field"><label>Precio por joven</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaJoven" value="${cfg.precioPersonaJoven}"></div>
@@ -2635,6 +2697,51 @@ function openPresupuestoModal(){
         });
       }
       modalEl.querySelector('#btnMostrarBarraLibre2').addEventListener('click', mostrarBarraLibre2);
+
+      const avisoPolitica = modalEl.querySelector('#politicaAviso');
+      function mostrarAviso(texto){ avisoPolitica.textContent = texto; avisoPolitica.style.display = 'block'; }
+
+      modalEl.querySelector('#btnAplicarPolitica').addEventListener('click', ()=>{
+        const horas = Number(modalEl.querySelector('[name="horas"]').value)||HORAS_BASE_POLITICA;
+        const jovenes = Number(modalEl.querySelector('[name="jovenes"]').value)||0;
+        const adultos = Number(modalEl.querySelector('[name="adultos"]').value)||0;
+        const totalPersonas = jovenes+adultos;
+        if(totalPersonas===0){ mostrarAviso('Cargá la cantidad de jóvenes y/o adultos primero.'); return; }
+        const precio = precioPorPersonaSegunHoras(totalPersonas, horas);
+        modalEl.querySelector('[name="precioPersonaJoven"]').value = precio.toLocaleString('es-PY');
+        modalEl.querySelector('[name="precioPersonaAdulto"]').value = precio.toLocaleString('es-PY');
+        const totalBase = totalPersonas * precioPorPersonaBase(totalPersonas);
+        modalEl.querySelector('[name="precioHoraAdicional"]').value = horaAdicionalUnitaria(totalBase, HORAS_BASE_POLITICA).toLocaleString('es-PY');
+        // si la Opción 2 está visible, aplicarle lo mismo con sus propias horas/personas
+        const horas2Input = modalEl.querySelector('[name="horas2"]');
+        if(horas2Input){
+          const horas2 = Number(horas2Input.value)||HORAS_BASE_POLITICA;
+          const jovenes2 = Number(modalEl.querySelector('[name="jovenes2"]').value)||0;
+          const adultos2 = Number(modalEl.querySelector('[name="adultos2"]').value)||0;
+          const totalPersonas2 = jovenes2+adultos2;
+          if(totalPersonas2>0){
+            const precio2 = precioPorPersonaSegunHoras(totalPersonas2, horas2);
+            modalEl.querySelector('[name="precioPersonaJoven2"]').value = precio2.toLocaleString('es-PY');
+            modalEl.querySelector('[name="precioPersonaAdulto2"]').value = precio2.toLocaleString('es-PY');
+          }
+        }
+        mostrarAviso(`Aplicado: Gs. ${precio.toLocaleString('es-PY')} por persona a ${horas} hora(s) (política: 6h base, -20%/+20% según horas).`);
+      });
+
+      modalEl.querySelector('#btnSugerirTragos').addEventListener('click', ()=>{
+        const jovenes = Number(modalEl.querySelector('[name="jovenes"]').value)||0;
+        const adultos = Number(modalEl.querySelector('[name="adultos"]').value)||0;
+        const totalPersonas = jovenes+adultos;
+        if(totalPersonas===0){ mostrarAviso('Cargá la cantidad de jóvenes y/o adultos primero.'); return; }
+        if(!confirm('Esto va a reemplazar las opciones de tragos con alcohol actuales por las 3 sugeridas. ¿Continuar?')) return;
+        const opciones = opcionesTragosRecomendadas(totalPersonas);
+        conContainer.innerHTML = opciones.map((op,i)=>tierBlockHtml('con', i, op.precio, op)).join('');
+        conCounter = opciones.length;
+        bindRemoveTiers(conContainer);
+        formatearInputsMonto(conContainer);
+        modalEl.querySelector('[name="precioTragoConAlcoholRef"]').value = PRECIO_TRAGO_ADICIONAL_FIJO.toLocaleString('es-PY');
+        mostrarAviso(`Sugerido: ${opciones.map(o=>o.cantidad+' tragos ('+fmtMoney(o.precio)+' c/u)').join(' · ')}. Trago adicional fijo: ${fmtMoney(PRECIO_TRAGO_ADICIONAL_FIJO)}.`);
+      });
     },
     onSave: (form)=>{
       const cfg = state.presupuestoConfig;
