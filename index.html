@@ -19,6 +19,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <script>
 /** @license
  *
@@ -694,7 +695,7 @@ function todosLosRoles(){ return ROLES.concat(state.rolesExtra||[]); }
 const TIPOS_TRABAJO = ['Logística','Limpieza','Producción'];
 const ACCIONES_LOG_LIMITE = 500;
 
-let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [] };
+let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [] };
 let colaboradorLimitadoUnlocked = null;
 let currentTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
 function toggleTheme(){
@@ -753,7 +754,12 @@ function formatearInputsMonto(root){
     el.dataset.formateado = '1';
   });
 }
-new MutationObserver(()=>formatearInputsMonto(document)).observe(document.body, {childList:true, subtree:true});
+let _formateoMontoPendiente = false;
+new MutationObserver(()=>{
+  if(_formateoMontoPendiente) return;
+  _formateoMontoPendiente = true;
+  requestAnimationFrame(()=>{ formatearInputsMonto(document); _formateoMontoPendiente = false; });
+}).observe(document.body, {childList:true, subtree:true});
 document.addEventListener('click', function(e){
   const el = e.target.closest('[data-goto-tab]');
   if(el){ currentTab = el.dataset.gotoTab; render(); }
@@ -773,6 +779,19 @@ function comprobantePagoTexto(pago){
   txt += `Fecha: ${fmtDate(pago.fecha)}\n`;
   if(pago.descripcion) txt += `Detalle: ${pago.descripcion}\n`;
   txt += `Monto: ${fmtMoney(pago.monto)}\n`;
+  return txt;
+}
+function textoEnvioInsumosEvento(ev){
+  const movs = state.movimientosInsumo.filter(m=>m.eventoId===ev.id);
+  const neto = {};
+  movs.forEach(m=>{ neto[m.insumoId] = (neto[m.insumoId]||0) + (m.tipo==='salida'?1:-1)*(Number(m.cantidad)||0); });
+  let txt = `📦 BLEND — Lista de insumos y herramientas\\n`;
+  txt += `Evento: ${ev.lugar||'(sin lugar)'} — ${fmtDate(ev.fecha)}\\n\\n`;
+  txt += `Se envía lo siguiente. Por favor confirmar qué vuelve al terminar (botellas cerradas cuentan entero, abiertas por la parte que sobra):\\n\\n`;
+  Object.entries(neto).filter(([,cant])=>cant>0).forEach(([insumoId,cant])=>{
+    const ins = state.insumos.find(i=>i.id===insumoId);
+    txt += `• ${ins?ins.nombre:'(insumo eliminado)'}${ins&&ins.unidad?' ('+ins.unidad+')':''}: ${cant}\\n`;
+  });
   return txt;
 }
 function waRecordatorioEvento(ev){
@@ -802,6 +821,9 @@ function waRecordatorioReunion(ev){
 
 async function loadState(){
   try{
+    if(firebase.auth && !firebase.auth().currentUser){
+      await firebase.auth().signInAnonymously();
+    }
     const snap = await db.collection('blend').doc('data').get();
     if(snap.exists){
       const parsed = snap.data();
@@ -828,6 +850,8 @@ async function loadState(){
       state.cargosAdicionales = parsed.cargosAdicionales || [];
       state.transferenciasCaja = parsed.transferenciasCaja || [];
       state.rolesExtra = parsed.rolesExtra || [];
+      state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
+      state.kits = parsed.kits || [];
       migrarProduccionAntigua();
       migrarRecetarioNuevosTragos();
     }
@@ -886,7 +910,7 @@ async function saveState(){
       insumos: state.insumos, movimientosInsumo: state.movimientosInsumo,
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
-      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra,
+      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits,
     });
     storageOk = true;
   }catch(e){
@@ -1000,6 +1024,55 @@ function stockInsumo(insumoId){
   const entradas = state.movimientosInsumo.filter(m=>m.insumoId===insumoId && m.tipo==='entrada').reduce((s,m)=>s+(Number(m.cantidad)||0),0);
   const salidas = state.movimientosInsumo.filter(m=>m.insumoId===insumoId && m.tipo==='salida').reduce((s,m)=>s+(Number(m.cantidad)||0),0);
   return inicial + entradas - salidas;
+}
+const ARCHIVO_ANTIGUEDAD_DIAS = 365;
+async function archivarDatosViejos(manual){
+  const cutoffTs = Date.now() - ARCHIVO_ANTIGUEDAD_DIAS*24*60*60*1000;
+  const cutoffFecha = new Date(cutoffTs).toISOString().slice(0,10);
+
+  const logArchivar = state.log.filter(l=>l.ts && l.ts<cutoffTs);
+  const logConservar = state.log.filter(l=>!l.ts || l.ts>=cutoffTs);
+  const movArchivar = state.movimientosInsumo.filter(m=>m.fecha && m.fecha<cutoffFecha);
+  const movConservar = state.movimientosInsumo.filter(m=>!m.fecha || m.fecha>=cutoffFecha);
+
+  if(logArchivar.length===0 && movArchivar.length===0){
+    state.ultimoArchivadoTs = Date.now();
+    saveState();
+    if(manual) alert('No hay nada de más de un año para archivar todavía.');
+    return;
+  }
+
+  // ajustar stockInicial de cada insumo para que el stock actual no cambie al sacar sus movimientos viejos
+  const netoPorInsumo = {};
+  movArchivar.forEach(m=>{
+    const signo = m.tipo==='entrada' ? 1 : -1;
+    netoPorInsumo[m.insumoId] = (netoPorInsumo[m.insumoId]||0) + signo*(Number(m.cantidad)||0);
+  });
+  Object.entries(netoPorInsumo).forEach(([insumoId, neto])=>{
+    const ins = state.insumos.find(i=>i.id===insumoId);
+    if(ins) ins.stockInicial = (Number(ins.stockInicial)||0) + neto;
+  });
+
+  try{
+    const ref = db.collection('blend').doc('archivo');
+    const snap = await ref.get();
+    const previo = snap.exists ? snap.data() : {};
+    await ref.set({
+      log: [...(previo.log||[]), ...logArchivar],
+      movimientosInsumo: [...(previo.movimientosInsumo||[]), ...movArchivar],
+      ultimaActualizacion: Date.now(),
+    });
+  }catch(err){
+    alert('No se pudo guardar el archivo en la nube (se cancela el archivado para no perder datos): ' + err.message);
+    return;
+  }
+
+  state.log = logConservar;
+  state.movimientosInsumo = movConservar;
+  state.ultimoArchivadoTs = Date.now();
+  pushLog(adminUnlocked ? adminUnlocked.nombre : 'Sistema', 'Archivado automático', `${logArchivar.length} del log, ${movArchivar.length} movimiento(s) de insumo — más de ${ARCHIVO_ANTIGUEDAD_DIAS} días`);
+  saveState();
+  if(manual){ alert(`Se archivaron ${logArchivar.length} registros de actividad y ${movArchivar.length} movimientos de insumo de más de un año. El stock actual no cambió.`); render(); }
 }
 function personasEnConflicto(fecha, eventoIdActual){
   // devuelve {personaId: [nombresDeEventos]} para personas asignadas a más de un evento la misma fecha
@@ -1220,6 +1293,7 @@ function openLoginModal(){
       if(admin && String(admin.pin).trim()===form.pin.value.trim()){
         adminUnlocked = {id: admin.id, nombre: admin.nombre};
         closeModal(); render();
+        if(Date.now() - (state.ultimoArchivadoTs||0) > 30*24*60*60*1000) archivarDatosViejos(false);
       } else {
         const err = document.getElementById('loginError');
         if(err) err.style.display = 'block';
@@ -1792,13 +1866,49 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
             const cf = modalEl.querySelector('#consumoForm');
             const insumoId = cf.querySelector('[name="insumoId"]').value;
             const cantidad = cf.querySelector('[name="cantidad"]').value;
+            const tipo = cf.querySelector('[name="tipoMovimiento"]').value;
             if(!insumoId || !cantidad) return;
             const ins = state.insumos.find(i=>i.id===insumoId);
-            state.movimientosInsumo.push({id:uid(), insumoId, tipo:'salida', cantidad, fecha: todayStr(), eventoId: ev.id, descripcion: `Consumo en evento: ${ev.lugar||''}`});
-            pushLog(adminUnlocked.nombre, 'Consumo de insumo registrado', `${ins?ins.nombre:''} -${cantidad} — ${ev.lugar||'(sin lugar)'}`);
+            const descripcion = tipo==='entrada' ? `Devolución del evento: ${ev.lugar||''}` : `Consumo en evento: ${ev.lugar||''}`;
+            state.movimientosInsumo.push({id:uid(), insumoId, tipo, cantidad, fecha: todayStr(), eventoId: ev.id, descripcion});
+            pushLog(adminUnlocked.nombre, tipo==='entrada' ? 'Devolución de insumo registrada' : 'Consumo de insumo registrado', `${ins?ins.nombre:''} ${tipo==='entrada'?'+':'-'}${cantidad} — ${ev.lugar||'(sin lugar)'}`);
             saveState(); closeModal(); render();
           });
         }
+        const kitSelect = modalEl.querySelector('#kitAplicarSelect');
+        const kitCantidad = modalEl.querySelector('#kitAplicarCantidad');
+        function sugerirCantidadKit(){
+          if(!kitSelect) return;
+          const kit = state.kits.find(k=>k.id===kitSelect.value);
+          if(kit && kit.rolAsociado){
+            const asignados = (ev.personalAsignado||[]).map(personaDe).filter(Boolean);
+            const cantidadRol = asignados.filter(p=>p.rol===kit.rolAsociado).length;
+            if(cantidadRol>0) kitCantidad.value = cantidadRol;
+          }
+        }
+        if(kitSelect){
+          sugerirCantidadKit();
+          kitSelect.addEventListener('change', sugerirCantidadKit);
+        }
+        function aplicarKit(tipo){
+          const kit = state.kits.find(k=>k.id===kitSelect.value);
+          if(!kit) return;
+          const mult = Number(kitCantidad.value)||0;
+          if(mult<=0) return alert('Ingresá una cantidad mayor a 0.');
+          if(kit.items.length===0) return alert('Ese kit no tiene ítems cargados.');
+          const descripcion = tipo==='entrada'
+            ? `Devolución del evento: ${ev.lugar||''} — kit "${kit.nombre}" x${mult}`
+            : `Consumo en evento: ${ev.lugar||''} — kit "${kit.nombre}" x${mult}`;
+          kit.items.forEach(it=>{
+            state.movimientosInsumo.push({id:uid(), insumoId: it.insumoId, tipo, cantidad: it.cantidad*mult, fecha: todayStr(), eventoId: ev.id, descripcion});
+          });
+          pushLog(adminUnlocked.nombre, tipo==='entrada' ? 'Devolución de kit registrada' : 'Envío de kit registrado', `${kit.nombre} x${mult} — ${ev.lugar||'(sin lugar)'}`);
+          saveState(); closeModal(); render();
+        }
+        const btnAplicarKitSalida = modalEl.querySelector('#btnAplicarKitSalida');
+        if(btnAplicarKitSalida) btnAplicarKitSalida.addEventListener('click', ()=>aplicarKit('salida'));
+        const btnAplicarKitEntrada = modalEl.querySelector('#btnAplicarKitEntrada');
+        if(btnAplicarKitEntrada) btnAplicarKitEntrada.addEventListener('click', ()=>aplicarKit('entrada'));
         const selTipoCargo = modalEl.querySelector('#tipoCargoAdicional');
         const inputPrecioCargo = modalEl.querySelector('#precioCargoAdicional');
         if(selTipoCargo){
@@ -1947,7 +2057,7 @@ function eventoDetailExtra(ev){
   const saldoPendiente = saldoPendienteEvento(ev);
   const destilados = uniqueDestiladosDeEvento(ev);
   const cobrosDelEvento = state.cobros.filter(c=>c.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
-  const consumosDelEvento = state.movimientosInsumo.filter(m=>m.eventoId===ev.id && m.tipo==='salida').sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
+  const consumosDelEvento = state.movimientosInsumo.filter(m=>m.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
   const cargosDelEvento = state.cargosAdicionales.filter(c=>c.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
   return `
     <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
@@ -2045,19 +2155,45 @@ function eventoDetailExtra(ev){
 
     ${state.insumos.length>0 ? `
     <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
-      <h3 style="font-size:0.95rem; margin:0 0 8px;">Consumo de insumos</h3>
-      <div class="section-hint" style="margin-top:-4px; margin-bottom:8px;">Descuenta automáticamente del inventario general.</div>
+      <h3 style="font-size:0.95rem; margin:0 0 8px;">Insumos: envío y devolución</h3>
+      <div class="section-hint" style="margin-top:-4px; margin-bottom:8px;">Registrá lo que sale para el evento, y cuando vuelva (botellas cerradas o parte de una abierta) registrá la devolución — el stock se ajusta solo con la diferencia real.</div>
       ${consumosDelEvento.length>0 ? `
       <div class="list-simple" style="margin-bottom:10px;">
-        ${consumosDelEvento.map(m=>{ const ins = state.insumos.find(x=>x.id===m.insumoId); return `<div class="li"><div class="t">${ins?ins.nombre:'(insumo eliminado)'}</div><div class="mono">-${m.cantidad}</div></div>`; }).join('')}
-      </div>` : '<div class="d" style="margin-bottom:10px;">Sin consumos registrados todavía.</div>'}
+        ${consumosDelEvento.map(m=>{ const ins = state.insumos.find(x=>x.id===m.insumoId); const esSalida = m.tipo==='salida'; return `<div class="li"><div class="t">${ins?ins.nombre:'(insumo eliminado)'} <span class="badge ${esSalida?'senado':'posible'}">${esSalida?'salió':'volvió'}</span></div><div class="mono" style="color:${esSalida?'var(--red)':'var(--sage)'};">${esSalida?'-':'+'}${m.cantidad}</div></div>`; }).join('')}
+      </div>
+      <div class="section-hint" style="margin-bottom:10px;">Consumo neto por insumo: ${(()=>{ const neto={}; consumosDelEvento.forEach(m=>{ neto[m.insumoId]=(neto[m.insumoId]||0)+(m.tipo==='salida'?1:-1)*(Number(m.cantidad)||0); }); return Object.entries(neto).map(([id,n])=>{ const ins=state.insumos.find(x=>x.id===id); return `${ins?ins.nombre:'—'}: ${n}`; }).join(' · ') || '—'; })()}</div>
+      ` : '<div class="d" style="margin-bottom:10px;">Sin movimientos registrados todavía.</div>'}
+
+      ${state.kits.length>0 ? `
+      <div style="background:var(--ink-3); border-radius:10px; padding:12px; margin-bottom:14px;">
+        <div class="section-hint" style="margin-top:0; margin-bottom:8px;">Aplicar kit (multiplica sus cantidades y registra todo junto)</div>
+        <div class="field-row" id="kitAplicarForm" style="align-items:flex-end; margin-bottom:0;">
+          <div class="field" style="margin-bottom:0;"><label>Kit</label>
+            <select name="kitId" id="kitAplicarSelect">${state.kits.map(k=>`<option value="${k.id}">${k.nombre}</option>`).join('')}</select>
+          </div>
+          <div class="field" style="margin-bottom:0; flex:0 0 90px;"><label>Cantidad</label><input type="number" name="multiplicador" id="kitAplicarCantidad" value="1"></div>
+        </div>
+        <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+          <button type="button" class="btn small" id="btnAplicarKitSalida">Registrar envío del kit</button>
+          <button type="button" class="btn small ghost" id="btnAplicarKitEntrada">Registrar devolución del kit</button>
+        </div>
+      </div>
+      ` : ''}
+
       <div class="field-row" id="consumoForm" style="align-items:flex-end;">
+        <div class="field" style="margin-bottom:0;"><label>Movimiento</label>
+          <select name="tipoMovimiento">
+            <option value="salida">Salió para el evento</option>
+            <option value="entrada">Volvió del evento (devolución)</option>
+          </select>
+        </div>
         <div class="field" style="margin-bottom:0;"><label>Insumo</label>
           <select name="insumoId">${state.insumos.map(i=>`<option value="${i.id}">${i.nombre} (stock: ${stockInsumo(i.id)})</option>`).join('')}</select>
         </div>
-        <div class="field" style="margin-bottom:0;"><label>Cantidad consumida</label><input type="number" name="cantidad"></div>
+        <div class="field" style="margin-bottom:0;"><label>Cantidad</label><input type="number" step="0.1" name="cantidad" placeholder="Ej: 2.5"></div>
       </div>
-      <button type="button" class="btn small" id="btnAgregarConsumo" style="margin-top:8px;">+ Registrar consumo</button>
+      <button type="button" class="btn small" id="btnAgregarConsumo" style="margin-top:8px;">+ Registrar movimiento</button>
+      ${consumosDelEvento.some(m=>m.tipo==='salida') ? `<a class="btn small ghost" style="margin-top:8px; margin-left:8px;" href="${waLink(textoEnvioInsumosEvento(ev))}" target="_blank" rel="noopener">Compartir lista con el encargado</a>` : ''}
     </div>` : ''}
   `;
 }
@@ -2393,6 +2529,11 @@ function presupuestoFormFields(){
       <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos" value="0"></div>
       <div class="field"><label>Precio por adulto</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaAdulto" value="${cfg.precioPersonaAdulto}"></div>
     </div>
+    <div id="barraLibre2Wrap">
+      <button type="button" class="btn small ghost" id="btnMostrarBarraLibre2" style="margin-bottom:16px;">+ Agregar otra opción de barra libre</button>
+    </div>
+
+    <div class="field"><label>Descuento sobre el total (%, opcional — para casos puntuales)</label><input type="number" name="descuentoPercent" min="0" max="100" value="" placeholder="Ej: 10"></div>
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Opciones de tragos con alcohol (1 a 3)</label>
     <div id="tragosConContainer">
@@ -2471,6 +2612,29 @@ function openPresupuestoModal(){
         });
       }
       modalEl.querySelector('#btnMostrarSin').addEventListener('click', mostrarSinAlcohol);
+
+      const barra2Wrap = modalEl.querySelector('#barraLibre2Wrap');
+      function mostrarBarraLibre2(){
+        barra2Wrap.innerHTML = `
+          <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Barra libre — Opción 2 (ej: otra cantidad de horas)</label>
+          <div class="field"><label>Horas de servicio de esta opción</label><input type="number" name="horas2" value="${cfg.horasBaseIncluidas}"></div>
+          <div class="field-row">
+            <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes2" value="0"></div>
+            <div class="field"><label>Precio por joven</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaJoven2" value="${cfg.precioPersonaJoven}"></div>
+          </div>
+          <div class="field-row">
+            <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos2" value="0"></div>
+            <div class="field"><label>Precio por adulto</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaAdulto2" value="${cfg.precioPersonaAdulto}"></div>
+          </div>
+          <button type="button" class="btn small danger" id="btnQuitarBarraLibre2" style="margin-bottom:16px;">Quitar Opción 2</button>
+        `;
+        formatearInputsMonto(barra2Wrap);
+        barra2Wrap.querySelector('#btnQuitarBarraLibre2').addEventListener('click', ()=>{
+          barra2Wrap.innerHTML = `<button type="button" class="btn small ghost" id="btnMostrarBarraLibre2" style="margin-bottom:16px;">+ Agregar otra opción de barra libre</button>`;
+          barra2Wrap.querySelector('#btnMostrarBarraLibre2').addEventListener('click', mostrarBarraLibre2);
+        });
+      }
+      modalEl.querySelector('#btnMostrarBarraLibre2').addEventListener('click', mostrarBarraLibre2);
     },
     onSave: (form)=>{
       const cfg = state.presupuestoConfig;
@@ -2504,6 +2668,13 @@ function openPresupuestoModal(){
         precioTragoConAlcohol: parseMonto(form.precioTragoConAlcoholRef.value)||cfg.precioTragoConAlcohol,
         precioTragoSinAlcohol: parseMonto(form.precioTragoSinAlcoholRef.value)||cfg.precioTragoSinAlcohol,
         tragosConAlcohol, tragosSinAlcohol,
+        descuentoPercent: Math.min(100, Math.max(0, Number(form.descuentoPercent.value)||0)),
+        barraLibre2: form.horas2 ? {
+          horas: Number(form.horas2.value)||cfg.horasBaseIncluidas,
+          jovenes: Number(form.jovenes2.value)||0, adultos: Number(form.adultos2.value)||0,
+          precioPersonaJoven: parseMonto(form.precioPersonaJoven2.value)||cfg.precioPersonaJoven,
+          precioPersonaAdulto: parseMonto(form.precioPersonaAdulto2.value)||cfg.precioPersonaAdulto,
+        } : null,
         incluye: [...cfg.incluye], observaciones: [...cfg.observaciones],
       };
       if(!p.eventoId){
@@ -2512,7 +2683,8 @@ function openPresupuestoModal(){
           id: uid(), estado: 'posible', fecha: p.fecha, lugar: lugarCompleto,
           tipoEvento: '', horasEvento: p.horas, horarioInicio: '', horarioMontaje: '',
           precioHoraAdicionalEvento: p.precioHoraAdicional, precioTragoAdicionalEvento: p.precioTragoConAlcohol,
-          adultos: p.adultos, jovenes: p.jovenes, cantidadPersonas: p.adultos + p.jovenes,
+          adultos: p.adultos, jovenes: p.jovenes,
+          cantidadPersonas: p.adultos + p.jovenes + (p.barraLibre2 ? (p.barraLibre2.adultos||0)+(p.barraLibre2.jovenes||0) : 0),
           tragosConAlcohol: p.tragosConAlcohol, tragosSinAlcohol: p.tragosSinAlcohol,
           tragos: '', tragosIds: [], personalAsignado: [],
           observaciones: `Generado automáticamente desde un presupuesto${p.nombreEvento?': '+p.nombreEvento:''}${p.cliente?' — '+p.cliente:''}`,
@@ -2533,12 +2705,16 @@ function openPresupuestoModal(){
 }
 
 function renderPresupuestoPrint(p){
+  const factorDescuento = 1 - (Number(p.descuentoPercent)||0)/100;
   const horasAdicionales = Math.max(0, p.horas - p.horasBaseIncluidas);
   const totalHorasAdicionales = horasAdicionales * p.precioHoraAdicional;
   const totalJovenes = (p.jovenes||0) * p.precioPersonaJoven;
   const totalAdultos = (p.adultos||0) * p.precioPersonaAdulto;
   const totalPersonas = (p.jovenes||0) + (p.adultos||0);
-  const totalBarraLibre = totalJovenes + totalAdultos + totalHorasAdicionales;
+  const totalBarraLibre = (totalJovenes + totalAdultos + totalHorasAdicionales + (p.zonaAjuste||0)) * factorDescuento;
+  const b2 = p.barraLibre2;
+  const totalBarraLibre2 = b2 ? ((b2.jovenes||0)*b2.precioPersonaJoven + (b2.adultos||0)*b2.precioPersonaAdulto) * factorDescuento : 0;
+  const totalPersonas2 = b2 ? (b2.jovenes||0)+(b2.adultos||0) : 0;
   const tragosConAlcohol = p.tragosConAlcohol || [];
   const tragosSinAlcohol = p.tragosSinAlcohol || [];
   const VERDE = '#182818';
@@ -2583,14 +2759,26 @@ function renderPresupuestoPrint(p){
             ${horasAdicionales>0?`<div>${horasAdicionales} hora(s) adicional(es): ${fmtMoney(totalHorasAdicionales)}</div>`:''}
             ${p.zonaAjuste?`<div>Ajuste de zona: ${fmtMoney(p.zonaAjuste)}</div>`:''}
           </div>
-          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee; font-weight:700;">Total barra libre: ${fmtMoney(totalBarraLibre + (p.zonaAjuste||0))}</div>
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee; font-weight:700;">Total barra libre: ${fmtMoney(totalBarraLibre)}</div>
+          ${p.descuentoPercent>0 ? `<div style="font-size:0.78rem; color:#888;">(incluye descuento del ${p.descuentoPercent}%)</div>` : ''}
+        </div>` : ''}
+
+        ${b2 && (b2.jovenes>0 || b2.adultos>0) ? `
+        <div style="margin-bottom:16px;">
+          <div style="font-weight:700; color:${VERDE}; margin-bottom:8px;">Servicio Barra Libre — Opción 2 — ${totalPersonas2} personas, ${b2.horas} horas.</div>
+          <div style="font-size:0.9rem; padding-left:4px;">
+            ${b2.jovenes>0?`<div>Barra libre ${b2.jovenes} jóvenes: ${fmtMoney(b2.jovenes*b2.precioPersonaJoven*factorDescuento)}</div>`:''}
+            ${b2.adultos>0?`<div>Barra libre ${b2.adultos} adultos: ${fmtMoney(b2.adultos*b2.precioPersonaAdulto*factorDescuento)}</div>`:''}
+          </div>
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee; font-weight:700;">Total barra libre — Opción 2: ${fmtMoney(totalBarraLibre2)}</div>
+          ${p.descuentoPercent>0 ? `<div style="font-size:0.78rem; color:#888;">(incluye descuento del ${p.descuentoPercent}%)</div>` : ''}
         </div>` : ''}
 
         ${tragosConAlcohol.length>0 ? `
         <div style="margin-bottom:16px;">
           <div style="font-weight:700; color:${VERDE}; margin-bottom:8px;">Servicio de pack de tragos.</div>
           <div style="font-size:0.9rem; padding-left:4px;">
-            ${tragosConAlcohol.map(t=>`<div>${t.cantidad} tragos x ${fmtMoney(t.precio)}: ${fmtMoney(t.cantidad*t.precio)}</div>`).join('')}
+            ${tragosConAlcohol.map(t=>`<div>${t.cantidad} tragos x ${fmtMoney(t.precio)}: ${fmtMoney(t.cantidad*t.precio*factorDescuento)}</div>`).join('')}
           </div>
         </div>` : ''}
 
@@ -2598,7 +2786,7 @@ function renderPresupuestoPrint(p){
         <div style="margin-bottom:16px;">
           <div style="font-weight:700; color:${VERDE}; margin-bottom:8px;">Servicio de pack de tragos sin alcohol.</div>
           <div style="font-size:0.9rem; padding-left:4px;">
-            ${tragosSinAlcohol.map(t=>`<div>${t.cantidad} tragos x ${fmtMoney(t.precio)}: ${fmtMoney(t.cantidad*t.precio)}</div>`).join('')}
+            ${tragosSinAlcohol.map(t=>`<div>${t.cantidad} tragos x ${fmtMoney(t.precio)}: ${fmtMoney(t.cantidad*t.precio*factorDescuento)}</div>`).join('')}
           </div>
         </div>` : ''}
 
@@ -2734,21 +2922,36 @@ function renderPresupuestoPrint(p){
     titulo('Opciones de servicio recomendadas para tu evento:', 12);
     espacio(8);
 
+    const factorDescuento = 1 - (Number(p.descuentoPercent)||0)/100;
     const horasAdicionales = Math.max(0, p.horas - p.horasBaseIncluidas);
     const totalHorasAdicionales = horasAdicionales * p.precioHoraAdicional;
     const totalJovenes = (p.jovenes||0) * p.precioPersonaJoven;
     const totalAdultos = (p.adultos||0) * p.precioPersonaAdulto;
     const totalPersonas = (p.jovenes||0) + (p.adultos||0);
-    const totalBarraLibre = totalJovenes + totalAdultos + totalHorasAdicionales + (p.zonaAjuste||0);
+    const totalBarraLibre = (totalJovenes + totalAdultos + totalHorasAdicionales + (p.zonaAjuste||0)) * factorDescuento;
+    const b2 = p.barraLibre2;
+    const totalPersonas2 = b2 ? (b2.jovenes||0)+(b2.adultos||0) : 0;
+    const totalBarraLibre2 = b2 ? ((b2.jovenes||0)*b2.precioPersonaJoven + (b2.adultos||0)*b2.precioPersonaAdulto) * factorDescuento : 0;
 
     if(p.jovenes>0 || p.adultos>0){
       linea(`Servicio Barra Libre ${totalPersonas} personas ${p.horas} horas.`, {bold:true, size:11.5});
       espacio(4);
-      if(p.jovenes>0) linea(`Barra libre ${p.jovenes} jóvenes : ${fmtMoney(totalJovenes)}`, {indent:14});
-      if(p.adultos>0) linea(`Barra libre ${p.adultos} adultos : ${fmtMoney(totalAdultos)}`, {indent:14});
-      if(horasAdicionales>0) linea(`${horasAdicionales} hora(s) adicional(es) : ${fmtMoney(totalHorasAdicionales)}`, {indent:14});
-      if(p.zonaAjuste) linea(`Ajuste de zona : ${fmtMoney(p.zonaAjuste)}`, {indent:14});
+      if(p.jovenes>0) linea(`Barra libre ${p.jovenes} jóvenes : ${fmtMoney(totalJovenes*factorDescuento)}`, {indent:14});
+      if(p.adultos>0) linea(`Barra libre ${p.adultos} adultos : ${fmtMoney(totalAdultos*factorDescuento)}`, {indent:14});
+      if(horasAdicionales>0) linea(`${horasAdicionales} hora(s) adicional(es) : ${fmtMoney(totalHorasAdicionales*factorDescuento)}`, {indent:14});
+      if(p.zonaAjuste) linea(`Ajuste de zona : ${fmtMoney(p.zonaAjuste*factorDescuento)}`, {indent:14});
       linea(`Total barra libre : ${fmtMoney(totalBarraLibre)}`, {indent:14, bold:true});
+      if(p.descuentoPercent>0) linea(`(incluye descuento del ${p.descuentoPercent}%)`, {indent:14, size:9, color:[130,130,130]});
+      espacio(16);
+    }
+
+    if(b2 && (b2.jovenes>0 || b2.adultos>0)){
+      linea(`Servicio Barra Libre — Opción 2 — ${totalPersonas2} personas ${b2.horas} horas.`, {bold:true, size:11.5});
+      espacio(4);
+      if(b2.jovenes>0) linea(`Barra libre ${b2.jovenes} jóvenes : ${fmtMoney(b2.jovenes*b2.precioPersonaJoven*factorDescuento)}`, {indent:14});
+      if(b2.adultos>0) linea(`Barra libre ${b2.adultos} adultos : ${fmtMoney(b2.adultos*b2.precioPersonaAdulto*factorDescuento)}`, {indent:14});
+      linea(`Total barra libre — Opción 2 : ${fmtMoney(totalBarraLibre2)}`, {indent:14, bold:true});
+      if(p.descuentoPercent>0) linea(`(incluye descuento del ${p.descuentoPercent}%)`, {indent:14, size:9, color:[130,130,130]});
       espacio(16);
     }
 
@@ -2756,7 +2959,7 @@ function renderPresupuestoPrint(p){
       linea('Servicio de pack de tragos .', {bold:true, size:11.5});
       espacio(4);
       (p.tragosConAlcohol||[]).forEach(t=>{
-        linea(`• Pack de ${t.cantidad} tragos : ${fmtMoney(t.cantidad*t.precio)}`, {indent:14});
+        linea(`• Pack de ${t.cantidad} tragos : ${fmtMoney(t.cantidad*t.precio*factorDescuento)}`, {indent:14});
       });
       espacio(16);
     }
@@ -2765,7 +2968,7 @@ function renderPresupuestoPrint(p){
       linea('Servicio de pack de tragos sin alcohol .', {bold:true, size:11.5});
       espacio(4);
       (p.tragosSinAlcohol||[]).forEach(t=>{
-        linea(`• Pack de ${t.cantidad} tragos : ${fmtMoney(t.cantidad*t.precio)}`, {indent:14});
+        linea(`• Pack de ${t.cantidad} tragos : ${fmtMoney(t.cantidad*t.precio*factorDescuento)}`, {indent:14});
       });
       espacio(16);
     }
@@ -3418,7 +3621,7 @@ function renderInsumos(){
   const rows = state.insumos;
   return `
     <div class="row-between">
-      <div><h2 class="section-title">Inventario</h2><div class="section-hint">Stock de insumos generales (bebidas, hielo, vasos, etc.) — sube con las compras, baja con lo que se consume en cada evento.</div></div>
+      <div><h2 class="section-title">Inventario</h2><div class="section-hint">Stock de insumos generales (bebidas, hielo, vasos, herramientas, etc.) — sube con las compras, baja con lo que se consume en cada evento.</div></div>
       <button class="btn" id="btnNuevoInsumo">+ Nuevo insumo</button>
     </div>
     ${rows.length===0 ? '<div class="empty">Todavía no cargaste insumos.</div>' : `
@@ -3438,7 +3641,64 @@ function renderInsumos(){
       </tbody>
     </table>
     </div>`}
+
+    <div class="row-between" style="margin-top:24px;">
+      <div><h3 style="margin:0; font-size:1rem;">Kits</h3><div class="section-hint">Combos de insumos que se mandan juntos a un evento — por ejemplo, todo lo que necesita una estación de bartender. Se multiplican por la cantidad que necesites al aplicarlos en un evento.</div></div>
+      <button class="btn small" id="btnNuevoKit" ${state.insumos.length===0?'disabled':''}>+ Nuevo kit</button>
+    </div>
+    ${state.kits.length===0 ? '<div class="empty">Todavía no armaste ningún kit.</div>' : state.kits.map(k=>`
+      <div class="card tight">
+        <div class="row-between" style="margin-bottom:6px;">
+          <div style="font-family:'Fraunces',serif; font-size:1.02rem;">${k.nombre}${k.rolAsociado?` <span class="badge posible">${k.rolAsociado}</span>`:''}</div>
+          <button class="btn small ghost" data-open-kit="${k.id}">Editar</button>
+        </div>
+        <div class="section-hint">${k.items.map(it=>{ const ins=state.insumos.find(i=>i.id===it.insumoId); return `${ins?ins.nombre:'—'}: ${it.cantidad}`; }).join(' · ') || 'Sin ítems'}</div>
+      </div>
+    `).join('')}
   `;
+}
+function kitFormFields(k){
+  k = k || {items:[]};
+  const cantidadDe = insumoId => { const it = k.items.find(x=>x.insumoId===insumoId); return it ? it.cantidad : ''; };
+  return `
+    <div class="field"><label>Nombre del kit</label><input type="text" name="nombre" value="${k.nombre||''}" placeholder="Ej: Estación de bartender"></div>
+    <div class="field"><label>Función asociada (opcional)</label>
+      <select name="rolAsociado">
+        <option value="">Ninguna — cantidad siempre manual</option>
+        ${todosLosRoles().map(r=>`<option value="${r}" ${k.rolAsociado===r?'selected':''}>${r}</option>`).join('')}
+      </select>
+      <div class="section-hint" style="margin-top:4px;">Si elegís una función, al aplicar el kit en un evento el sistema va a sugerir la cantidad según cuántas personas con esa función estén asignadas.</div>
+    </div>
+    <div class="section-hint" style="margin:14px 0 6px;">Cantidad de cada insumo que lleva UNA unidad de este kit (dejá en blanco o 0 lo que no aplique):</div>
+    <div style="display:flex; flex-direction:column; gap:6px; max-height:320px; overflow-y:auto; padding-right:4px;">
+      ${state.insumos.map(i=>`
+        <div class="field-row" style="align-items:center; margin-bottom:0;">
+          <div style="flex:1; font-size:0.86rem;">${i.nombre}${i.unidad?` (${i.unidad})`:''}</div>
+          <div class="field" style="flex:0 0 90px; margin-bottom:0;"><input type="number" step="0.1" name="kititem_${i.id}" value="${cantidadDe(i.id)}"></div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+function openKitModal(id){
+  const k = id ? state.kits.find(x=>x.id===id) : null;
+  modalContent = {
+    title: k ? 'Editar kit' : 'Nuevo kit',
+    bodyHtml: kitFormFields(k),
+    onSave: (form)=>{
+      const nombre = form.nombre.value.trim();
+      if(!nombre) return alert('Ingresá un nombre para el kit.');
+      const items = state.insumos.map(i=>({ insumoId: i.id, cantidad: Number(form[`kititem_${i.id}`].value)||0 })).filter(x=>x.cantidad>0);
+      const data = { nombre, rolAsociado: form.rolAsociado.value || null, items };
+      if(k){ Object.assign(k, data); pushLog(adminUnlocked.nombre, 'Kit editado', nombre); }
+      else { state.kits.push(Object.assign({id:uid()}, data)); pushLog(adminUnlocked.nombre, 'Kit creado', nombre); }
+      saveState(); closeModal(); render();
+    },
+    onDelete: k ? ()=>{
+      if(confirm(`¿Eliminar el kit "${k.nombre}"?`)){ state.kits = state.kits.filter(x=>x.id!==k.id); pushLog(adminUnlocked.nombre, 'Kit eliminado', k.nombre); saveState(); closeModal(); render(); }
+    } : null,
+  };
+  render();
 }
 function insumoFormFields(i){
   i = i || {};
@@ -4368,7 +4628,9 @@ function renderActividad(){
   return `
     <div class="row-between">
       <div><h2 class="section-title">Actividad</h2><div class="section-hint">Quién creó, editó o eliminó cada cosa — últimos ${rows.length} movimientos.</div></div>
+      <button class="btn ghost small" id="btnArchivarAhora">Archivar registros de más de 1 año</button>
     </div>
+    <div class="section-hint" style="margin-top:-10px; margin-bottom:16px;">Cada vez que un administrador ingresa, el sistema revisa solo (cada 30 días) si hay actividad o movimientos de insumo de más de un año y los guarda aparte, sin borrarlos — así esto no crece para siempre. Último archivado: ${state.ultimoArchivadoTs ? new Date(state.ultimoArchivadoTs).toLocaleDateString('es-PY') : 'nunca'}.</div>
     ${rows.length===0 ? '<div class="empty">Todavía no hay actividad registrada.</div>' : `
     <div class="card" style="padding:0;">
     <table>
@@ -4619,6 +4881,9 @@ function bindPanelEvents(){
   panel.querySelectorAll('[data-open-personal]').forEach(b=>b.addEventListener('click', ()=>openPersonalModal(b.dataset.openPersonal)));
 
   const tarifasForm = document.getElementById('tarifasForm');
+  const btnArchivarAhora = document.getElementById('btnArchivarAhora');
+  if(btnArchivarAhora) btnArchivarAhora.addEventListener('click', ()=>archivarDatosViejos(true));
+
   const reportesMesSelect = document.getElementById('reportesMesSelect');
   if(reportesMesSelect) reportesMesSelect.addEventListener('change', ()=>{ reportesMesFiltro = reportesMesSelect.value; renderPanel(); });
 
@@ -4705,6 +4970,9 @@ function bindPanelEvents(){
   const btnNuevoInsumo = document.getElementById('btnNuevoInsumo');
   if(btnNuevoInsumo) btnNuevoInsumo.addEventListener('click', ()=>openInsumoModal(null));
   panel.querySelectorAll('[data-open-insumo]').forEach(b=>b.addEventListener('click', ()=>openInsumoModal(b.dataset.openInsumo)));
+  const btnNuevoKit = document.getElementById('btnNuevoKit');
+  if(btnNuevoKit) btnNuevoKit.addEventListener('click', ()=>openKitModal(null));
+  panel.querySelectorAll('[data-open-kit]').forEach(b=>b.addEventListener('click', ()=>openKitModal(b.dataset.openKit)));
 
   const dispFecha = document.getElementById('dispFecha');
   if(dispFecha) dispFecha.addEventListener('change', ()=>{ disponibilidadFecha = dispFecha.value; renderPanel(); });
@@ -4753,7 +5021,7 @@ function bindPanelEvents(){
       insumos: state.insumos, movimientosInsumo: state.movimientosInsumo,
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
-      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra,
+      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits,
     }, null, 2);
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -4794,6 +5062,8 @@ function bindPanelEvents(){
         state.cargosAdicionales = parsed.cargosAdicionales || [];
         state.transferenciasCaja = parsed.transferenciasCaja || [];
         state.rolesExtra = parsed.rolesExtra || [];
+        state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
+        state.kits = parsed.kits || [];
         if(parsed.admins && parsed.admins.length) state.admins = parsed.admins;
         if(parsed.log && parsed.log.length) state.log = parsed.log;
         pushLog(adminUnlocked.nombre, 'Importó copia de seguridad completa', file.name);
