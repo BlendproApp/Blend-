@@ -731,6 +731,13 @@ function withTimeout(promise, ms){
   ]);
 }
 let storageOk = true;
+let ultimoErrorGuardado = null; // guarda el código/mensaje real del último error de guardado o carga, para poder diagnosticar si vuelve a pasar
+function refrescarPantallaCompleta(){
+  // vuelve a dibujar toda la pantalla (encabezado + aviso de guardado incluidos), no solo el panel interno —
+  // hace falta para que el aviso rojo "No se pudo conectar con el guardado" aparezca o desaparezca correctamente
+  if(appMode==='colaborador' && colaboradorLimitadoUnlocked) renderColaboradorPanel();
+  else if(appMode==='admin') render();
+}
 function fmtMoney(n){
   n = Number(n)||0;
   return 'Gs. ' + n.toLocaleString('es-PY', {maximumFractionDigits:0});
@@ -938,6 +945,7 @@ async function loadState(intentoNro){
       return loadState(intentoNro+1);
     }
     storageOk = false;
+    ultimoErrorGuardado = (e && (e.code || e.message)) ? `${e.code||''} ${e.message||''}`.trim() : 'error desconocido';
   }
 }
 
@@ -998,7 +1006,10 @@ async function saveState(intentoNro){
     });
     const huboError = !storageOk;
     storageOk = true;
-    if(huboError) renderPanel(); // si veníamos mostrando el aviso de error, lo sacamos apenas un guardado funciona de nuevo
+    ultimoErrorGuardado = null;
+    // ojo: el aviso rojo y su botón "Reintentar" viven en el encabezado (fuera de #panel), así que para
+    // sacarlos o refrescarlos hay que rehacer toda la pantalla (render/renderColaboradorPanel), no solo renderPanel()
+    if(huboError) refrescarPantallaCompleta();
   }catch(e){
     console.error('No se pudo guardar (intento '+(intentoNro+1)+')', e);
     if(intentoNro < 2){
@@ -1007,7 +1018,8 @@ async function saveState(intentoNro){
       return saveState(intentoNro+1);
     }
     storageOk = false;
-    renderPanel();
+    ultimoErrorGuardado = (e && (e.code || e.message)) ? `${e.code||''} ${e.message||''}`.trim() : 'error desconocido';
+    refrescarPantallaCompleta();
   }
 }
 
@@ -1401,7 +1413,7 @@ function render(){
     <nav class="tabs sub-tabs">
       ${seccionActual.tabs.map(([k,label])=>`<button data-tab="${k}" class="${currentTab===k?'active':''}">${label}</button>`).join('')}
     </nav>` : '<div style="height:20px;"></div>'}
-    ${!storageOk ? `<div class="card tight" style="border-color:var(--red-dim); background:rgba(192,96,79,0.1); margin-bottom:16px; font-size:0.82rem; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><span>No se pudo conectar con el guardado — los cambios que hagas ahora podrían no quedar guardados. Revisá tu conexión.</span><button class="btn ghost small" id="btnReintentarGuardado">Reintentar</button></div>` : ''}
+    ${!storageOk ? `<div class="card tight" style="border-color:var(--red-dim); background:rgba(192,96,79,0.1); margin-bottom:16px; font-size:0.82rem; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><span>No se pudo conectar con el guardado — los cambios que hagas ahora podrían no quedar guardados. Revisá tu conexión.${ultimoErrorGuardado?` <span style="opacity:0.7;">(Motivo: ${ultimoErrorGuardado} — mandale una captura de esto a Ricardo)</span>`:''}</span><button class="btn ghost small" id="btnReintentarGuardado">Reintentar</button></div>` : ''}
     <div class="panel" id="panel"></div>
   `;
   app.querySelectorAll('nav.secciones-nav button').forEach(b=>{
