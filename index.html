@@ -696,7 +696,7 @@ function todosLosRoles(){ return ROLES.concat(state.rolesExtra||[]); }
 const TIPOS_TRABAJO = ['Logística','Limpieza','Producción'];
 const ACCIONES_LOG_LIMITE = 500;
 
-let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [] };
+let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [], prestamos: [] };
 let colaboradorLimitadoUnlocked = null;
 let currentTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
 function toggleTheme(){
@@ -885,10 +885,16 @@ function waRecordatorioReunion(ev){
   return `🤝 Recordatorio\nReunión con planner${ev.planner?' ('+ev.planner+')':''} — ${ev.lugar||'(sin lugar)'}\nFecha: ${fmtDate(ev.reunionPlannerFecha)}`;
 }
 
-async function loadState(){
+async function loadState(intentoNro){
+  intentoNro = intentoNro || 0;
   try{
-    if(firebase.auth && !firebase.auth().currentUser){
-      await firebase.auth().signInAnonymously();
+    if(firebase.auth){
+      if(intentoNro===0){
+        try{ await firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(persistErr){ console.warn('No se pudo fijar persistencia de auth', persistErr); }
+      }
+      if(!firebase.auth().currentUser){
+        await firebase.auth().signInAnonymously();
+      }
     }
     const snap = await db.collection('blend').doc('data').get();
     if(snap.exists){
@@ -918,13 +924,19 @@ async function loadState(){
       state.rolesExtra = parsed.rolesExtra || [];
       state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
       state.kits = parsed.kits || [];
+      state.prestamos = parsed.prestamos || [];
       migrarProduccionAntigua();
       migrarRecetarioNuevosTragos();
       state.insumos.forEach(ins=>{ if(!ins.tipo) ins.tipo = 'herramienta'; });
     }
     storageOk = true;
   }catch(e){
-    console.error('No se pudo cargar', e);
+    console.error('No se pudo cargar (intento '+(intentoNro+1)+')', e);
+    if(intentoNro < 2){
+      // en datos móviles la primera conexión (auth + Firestore) a veces tarda o falla una vez; reintentamos antes de rendirnos
+      await new Promise(r=> setTimeout(r, 1500 * (intentoNro+1)));
+      return loadState(intentoNro+1);
+    }
     storageOk = false;
   }
 }
@@ -966,8 +978,13 @@ function migrarRecetarioNuevosTragos(){
   if(agregado) saveState();
 }
 
-async function saveState(){
+async function saveState(intentoNro){
+  intentoNro = intentoNro || 0;
   try{
+    // si por algún motivo (cambio de red, app en segundo plano en el celular) la sesión anónima se perdió, la recuperamos antes de guardar
+    if(firebase.auth && !firebase.auth().currentUser){
+      try{ await firebase.auth().signInAnonymously(); }catch(authErr){ console.warn('No se pudo reautenticar antes de guardar', authErr); }
+    }
     await db.collection('blend').doc('data').set({
       eventos: state.eventos, personal: state.personal, produccion: state.produccion,
       compras: state.compras, gastos: state.gastos, pagos: state.pagos,
@@ -977,11 +994,18 @@ async function saveState(){
       insumos: state.insumos, movimientosInsumo: state.movimientosInsumo,
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
-      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits,
+      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
     });
+    const huboError = !storageOk;
     storageOk = true;
+    if(huboError) renderPanel(); // si veníamos mostrando el aviso de error, lo sacamos apenas un guardado funciona de nuevo
   }catch(e){
-    console.error('No se pudo guardar', e);
+    console.error('No se pudo guardar (intento '+(intentoNro+1)+')', e);
+    if(intentoNro < 2){
+      // en datos móviles suele ser un corte momentáneo (cambio de antena, wifi↔datos); reintentamos antes de avisar al usuario
+      await new Promise(r=> setTimeout(r, 1500 * (intentoNro+1)));
+      return saveState(intentoNro+1);
+    }
     storageOk = false;
     renderPanel();
   }
@@ -1343,6 +1367,7 @@ function render(){
     { id: 'catalogo', label: 'Catálogo', icon: '◇', tabs: [
       ['recetario','Recetario'],
       ['insumos','Inventario'],
+      ['prestamos','Préstamos y Alquileres'],
     ]},
     { id: 'reportes', label: 'Reportes', icon: '▦', tabs: [
       ['reportes','Reportes'],
@@ -1376,7 +1401,7 @@ function render(){
     <nav class="tabs sub-tabs">
       ${seccionActual.tabs.map(([k,label])=>`<button data-tab="${k}" class="${currentTab===k?'active':''}">${label}</button>`).join('')}
     </nav>` : '<div style="height:20px;"></div>'}
-    ${!storageOk ? `<div class="card tight" style="border-color:var(--red-dim); background:rgba(192,96,79,0.1); margin-bottom:16px; font-size:0.82rem;">No se pudo conectar con el guardado — los cambios que hagas ahora podrían no quedar guardados. Probá recargar la página.</div>` : ''}
+    ${!storageOk ? `<div class="card tight" style="border-color:var(--red-dim); background:rgba(192,96,79,0.1); margin-bottom:16px; font-size:0.82rem; display:flex; align-items:center; gap:10px; flex-wrap:wrap;"><span>No se pudo conectar con el guardado — los cambios que hagas ahora podrían no quedar guardados. Revisá tu conexión.</span><button class="btn ghost small" id="btnReintentarGuardado">Reintentar</button></div>` : ''}
     <div class="panel" id="panel"></div>
   `;
   app.querySelectorAll('nav.secciones-nav button').forEach(b=>{
@@ -1395,6 +1420,12 @@ function render(){
   if(btnLogoutAdmin) btnLogoutAdmin.addEventListener('click', ()=>{ adminUnlocked = null; currentTab='calendario'; renderLanding(); });
   const btnInicio = document.getElementById('btnInicio');
   if(btnInicio) btnInicio.addEventListener('click', ()=>{ adminUnlocked = null; currentTab='calendario'; renderLanding(); });
+  const btnReintentarGuardado = document.getElementById('btnReintentarGuardado');
+  if(btnReintentarGuardado) btnReintentarGuardado.addEventListener('click', async ()=>{
+    btnReintentarGuardado.textContent = 'Reintentando…';
+    btnReintentarGuardado.disabled = true;
+    await saveState();
+  });
   bindThemeToggle();
   renderPanel();
   if(modalContent) renderModal(); else removeModal();
@@ -1444,6 +1475,7 @@ function renderPanel(){
     produccion: renderProduccion,
     compras: renderCompras,
     insumos: renderInsumos,
+    prestamos: renderPrestamos,
     gastos: renderGastos,
     cajas: renderCajas,
     pagos: renderPagos,
@@ -1451,7 +1483,7 @@ function renderPanel(){
     actividad: renderActividad,
     administradores: renderAdministradores,
   };
-  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','gastos','cajas','pagos','reportes','actividad','administradores']);
+  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','cajas','pagos','reportes','actividad','administradores']);
   if(adminOnly.has(currentTab) && !adminUnlocked){
     panel.innerHTML = `<div class="empty">Necesitás ingresar como administrador para ver esta sección.</div>`;
     return;
@@ -2327,32 +2359,41 @@ function eventoDetailExtra(ev){
 // ================= COBROS =================
 function renderCobros(){
   const rows = [...state.cobros].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
-  const totalCliente = sumaWhere(state.cobros, c=>c.tipo!=='planner');
+  const totalCliente = sumaWhere(state.cobros, c=>c.tipo==='cliente' || !c.tipo);
   const totalPlanner = sumaWhere(state.cobros, c=>c.tipo==='planner');
+  const totalPrestamo = sumaWhere(state.cobros, c=>c.tipo==='prestamo');
   return `
     <div class="row-between">
-      <div><h2 class="section-title">Cobros</h2><div class="section-hint">Todo lo cobrado a clientes o a planners, de todos los eventos, en un solo lugar — suma como ingreso a la caja que elijas.</div></div>
+      <div><h2 class="section-title">Cobros</h2><div class="section-hint">Todo lo cobrado a clientes, planners o por préstamos/alquileres de ítems, en un solo lugar — suma como ingreso a la caja que elijas.</div></div>
       <button class="btn" id="btnNuevoCobro" ${(state.eventos.length===0||state.cajas.length===0)?'disabled title="Cargá un evento y una caja primero"':''}>+ Nuevo cobro</button>
     </div>
     <div class="grid-cards">
       <div class="stat"><div class="k">Total cobrado a clientes</div><div class="v sage">${fmtMoney(totalCliente)}</div></div>
       <div class="stat"><div class="k">Total cobrado a planners</div><div class="v sage">${fmtMoney(totalPlanner)}</div></div>
+      ${totalPrestamo>0 ? `<div class="stat"><div class="k">Total cobrado por préstamos/alquileres</div><div class="v sage">${fmtMoney(totalPrestamo)}</div></div>` : ''}
     </div>
-    ${state.eventos.length===0 ? '<div class="empty">Cargá al menos un evento para poder registrar cobros.</div>' : (rows.length===0 ? '<div class="empty">No hay cobros registrados.</div>' : `
+    ${state.eventos.length===0 && rows.length===0 ? '<div class="empty">Cargá al menos un evento para poder registrar cobros.</div>' : (rows.length===0 ? '<div class="empty">No hay cobros registrados.</div>' : `
     <div class="card" style="padding:0; overflow-x:auto;">
     <table>
       <thead><tr><th>Fecha</th><th>Evento</th><th>Quién paga</th><th>Caja</th><th>Cargado por</th><th>Nota</th><th>Monto</th><th></th></tr></thead>
       <tbody>
-      ${rows.map(c=>{ const ev = eventosDe(c.eventoId); const caja = state.cajas.find(x=>x.id===c.cajaId); const adminC = state.admins.find(a=>a.id===c.adminId); return `
+      ${rows.map(c=>{
+        const ev = c.eventoId ? eventosDe(c.eventoId) : null;
+        const caja = state.cajas.find(x=>x.id===c.cajaId);
+        const adminC = state.admins.find(a=>a.id===c.adminId);
+        const prestamo = c.prestamoId ? state.prestamos.find(x=>x.id===c.prestamoId) : null;
+        const etiquetaEvento = prestamo ? `Préstamo/alquiler: ${prestamo.tercero}` : (ev ? ev.lugar||'(sin lugar)' : (c.eventoId ? '(evento eliminado)' : '—'));
+        const etiquetaTipo = c.tipo==='planner' ? 'Planner' : (c.tipo==='prestamo' ? 'Préstamo/Alquiler' : 'Cliente');
+        return `
         <tr>
           <td>${fmtDate(c.fecha)}</td>
-          <td>${ev?ev.lugar||'(sin lugar)':'(evento eliminado)'}</td>
-          <td><span class="badge posible">${c.tipo==='planner'?'Planner':'Cliente'}</span></td>
+          <td>${etiquetaEvento}</td>
+          <td><span class="badge posible">${etiquetaTipo}</span></td>
           <td>${caja?caja.nombre:'—'}</td>
           <td style="color:var(--cream-dim);">${adminC?adminC.nombre:'—'}</td>
           <td style="color:var(--cream-dim);">${c.descripcion||'—'}</td>
           <td class="mono" style="color:var(--sage);">${fmtMoney(c.monto)}</td>
-          <td><button class="btn small ghost" data-open-cobro="${c.id}">Editar</button></td>
+          <td>${prestamo ? `<span class="section-hint">Editar desde Préstamos</span>` : `<button class="btn small ghost" data-open-cobro="${c.id}">Editar</button>`}</td>
         </tr>
       `;}).join('')}
       </tbody>
@@ -4017,6 +4058,249 @@ function openKitModal(id){
   };
   render();
 }
+
+// ================= PRÉSTAMOS Y ALQUILERES DE HERRAMIENTAS (a terceros, fuera de eventos) =================
+// Solo administradores pueden crear/editar/devolver — la pestaña está en adminOnly.
+// Cada préstamo mueve stock igual que un evento: al crearlo se registra una "salida" en movimientosInsumo
+// (con prestamoId en vez de eventoId), y al devolver se registra la "entrada" correspondiente.
+function itemsPendientesPrestamo(p){
+  return (p.items||[]).map(it=>{
+    const insumo = state.insumos.find(i=>i.id===it.insumoId);
+    const devuelto = state.movimientosInsumo.filter(m=>m.prestamoId===p.id && m.insumoId===it.insumoId && m.tipo==='entrada').reduce((s,m)=>s+(Number(m.cantidad)||0),0);
+    return { insumoId: it.insumoId, insumo, entregado: Number(it.cantidad)||0, devuelto, pendiente: (Number(it.cantidad)||0) - devuelto };
+  }).filter(x=>x.insumo);
+}
+function prestamoTieneDevolucionesRegistradas(p){
+  return state.movimientosInsumo.some(m=>m.prestamoId===p.id && m.tipo==='entrada');
+}
+function prestamoEstaAtrasado(p){
+  return !p.devuelto && p.fechaEsperadaDevolucion && p.fechaEsperadaDevolucion < todayStr();
+}
+function prestamosSinDevolver(){
+  return state.prestamos.filter(p=>!p.devuelto).sort((a,b)=>{
+    const atA = prestamoEstaAtrasado(a), atB = prestamoEstaAtrasado(b);
+    if(atA!==atB) return atA ? -1 : 1;
+    return (a.fechaEsperadaDevolucion||'9999').localeCompare(b.fechaEsperadaDevolucion||'9999');
+  });
+}
+function renderPrestamos(){
+  const pendientes = prestamosSinDevolver();
+  const historial = state.prestamos.filter(p=>p.devuelto).sort((a,b)=>(b.fechaDevolucion||'').localeCompare(a.fechaDevolucion||''));
+  return `
+    <div class="row-between">
+      <div><h2 class="section-title">Préstamos y Alquileres</h2><div class="section-hint">Herramientas que salen a terceros (fuera de tus eventos) — con o sin costo. Afecta el stock igual que un envío a evento.</div></div>
+      <button class="btn" id="btnNuevoPrestamo" ${state.insumos.length===0?'disabled':''}>+ Nuevo préstamo/alquiler</button>
+    </div>
+
+    ${pendientes.length>0 ? `
+    <div class="card" style="border-color:var(--gold); margin-bottom:20px;">
+      <h3 style="margin-top:0; font-size:0.95rem;">Sin devolver</h3>
+      <div class="section-hint" style="margin-top:-6px;">Lo que salió a terceros y todavía no volvió. En rojo, lo que ya pasó la fecha esperada de devolución.</div>
+      <div class="list-simple" style="margin-top:10px;">
+        ${pendientes.map(p=>{
+          const atrasado = prestamoEstaAtrasado(p);
+          const items = itemsPendientesPrestamo(p).filter(it=>it.pendiente>0);
+          return `<div class="li">
+            <div class="t">${p.tercero}${p.modalidad==='alquiler'?` <span class="badge posible">Alquiler${p.monto?' — '+fmtMoney(p.monto):''}</span>`:' <span class="badge">Préstamo</span>'}${atrasado?' <span class="badge" style="background:rgba(192,96,79,0.18); color:var(--red);">Atrasado</span>':''}</div>
+            <div class="d">${items.map(it=>`${it.insumo.nombre}: ${it.pendiente}`).join(', ')} — salió ${fmtDate(p.fechaSalida)}${p.fechaEsperadaDevolucion?` · vuelve ${fmtDate(p.fechaEsperadaDevolucion)}`:''}${p.entregadoPorNombre?` · entregó ${p.entregadoPorNombre}`:''}${p.cobroId?` · cobro registrado en ${(state.cajas.find(cc=>cc.id===p.cajaId)||{}).nombre||'—'}`:''}</div>
+            <div style="display:flex; gap:8px; margin-top:4px;">
+              <button class="btn small ghost" data-open-prestamo="${p.id}">Editar</button>
+              <button class="btn small" data-devolver-prestamo="${p.id}">Registrar devolución</button>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>` : ''}
+
+    ${historial.length>0 ? `
+    <div class="card tight" style="margin-bottom:20px;">
+      <h3 style="margin-top:0; font-size:0.9rem;">Historial de devueltos</h3>
+      <div class="list-simple" style="margin-top:8px;">
+        ${historial.map(p=>`<div class="li">
+          <div class="t">${p.tercero}${p.modalidad==='alquiler'?` <span class="badge posible">Alquiler${p.monto?' — '+fmtMoney(p.monto):''}</span>`:' <span class="badge">Préstamo</span>'}</div>
+          <div class="d">${(p.items||[]).map(it=>{ const ins=state.insumos.find(i=>i.id===it.insumoId); return ins?`${ins.nombre}: ${it.cantidad}`:null; }).filter(Boolean).join(', ')} — salió ${fmtDate(p.fechaSalida)}, volvió ${fmtDate(p.fechaDevolucion)}${p.recibidoPorNombre?` · recibió ${p.recibidoPorNombre}`:''}</div>
+        </div>`).join('')}
+      </div>
+    </div>` : ''}
+
+    ${pendientes.length===0 && historial.length===0 ? '<div class="empty">Todavía no registraste ningún préstamo o alquiler.</div>' : ''}
+  `;
+}
+function prestamoFormFields(p){
+  p = p || {};
+  const yaDevolvioAlgo = p.id ? prestamoTieneDevolucionesRegistradas(p) : false;
+  const cantidadDe = insumoId => { const it = (p.items||[]).find(x=>x.insumoId===insumoId); return it ? it.cantidad : ''; };
+  return `
+    <div class="field-row">
+      <div class="field"><label>¿Quién pidió el ítem? (nombre)</label><input type="text" name="tercero" value="${p.tercero||''}" placeholder="Nombre de la persona o negocio"></div>
+      <div class="field"><label>Contacto (opcional)</label><input type="text" name="terceroContacto" value="${p.terceroContacto||''}" placeholder="Teléfono / WhatsApp"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Modalidad</label>
+        <select name="modalidad">
+          <option value="prestamo" ${(!p.modalidad || p.modalidad==='prestamo')?'selected':''}>Préstamo (sin costo)</option>
+          <option value="alquiler" ${p.modalidad==='alquiler'?'selected':''}>Alquiler (con costo)</option>
+        </select>
+      </div>
+      <div class="field"><label>Monto a cobrar (si es alquiler)</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${p.monto||''}" placeholder="0" ${yaDevolvioAlgo?'disabled':''}></div>
+    </div>
+    <div class="field"><label>Caja donde entra el cobro (si es alquiler con monto)</label>
+      <select name="cajaId" ${yaDevolvioAlgo?'disabled':''}>
+        <option value="">— No genera cobro —</option>
+        ${cajasDisponibles().map(cc=>`<option value="${cc.id}" ${p.cajaId===cc.id?'selected':''}>${cc.nombre}</option>`).join('')}
+      </select>
+      <div class="section-hint" style="margin-top:4px;">${yaDevolvioAlgo ? 'El monto y la caja del cobro ya no se pueden cambiar acá porque este préstamo ya tiene una devolución parcial registrada.' : 'Si elegís una caja y cargás un monto, se registra automáticamente como un cobro y suma a esa caja — vas a verlo también en la pestaña Cobros.'}</div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Fecha de salida</label><input type="date" name="fechaSalida" value="${p.fechaSalida||todayStr()}"></div>
+      <div class="field"><label>Fecha esperada de devolución (opcional)</label><input type="date" name="fechaEsperadaDevolucion" value="${p.fechaEsperadaDevolucion||''}"></div>
+    </div>
+    <div class="field"><label>¿Quién entrega?</label>
+      <select name="entregadoPor">
+        ${state.admins.map(a=>`<option value="${a.id}" ${(p.entregadoPor?p.entregadoPor===a.id:adminUnlocked&&adminUnlocked.id===a.id)?'selected':''}>${a.nombre}</option>`).join('')}
+      </select>
+    </div>
+    <div class="section-hint" style="margin:14px 0 6px;">Ítems y cantidad que se llevan:</div>
+    ${yaDevolvioAlgo ? `<div class="section-hint" style="color:var(--gold);">Ya se registró una devolución parcial de este préstamo, así que las cantidades de ítems no se pueden editar acá. Usá "Registrar devolución" para el resto.</div>` : ''}
+    <div style="display:flex; flex-direction:column; gap:6px; max-height:280px; overflow-y:auto; padding-right:4px;">
+      ${state.insumos.map(i=>`
+        <div class="field-row" style="align-items:center; margin-bottom:0;">
+          <div style="flex:1; font-size:0.86rem;">${i.nombre}${i.unidad?` (${i.unidad})`:''}</div>
+          <div class="field" style="flex:0 0 90px; margin-bottom:0;"><input type="number" step="0.1" name="prestitem_${i.id}" value="${cantidadDe(i.id)}" ${yaDevolvioAlgo?'disabled':''}></div>
+        </div>
+      `).join('')}
+    </div>
+    <div class="field" style="margin-top:14px;"><label>Notas (opcional)</label><textarea name="notas" rows="2">${p.notas||''}</textarea></div>
+  `;
+}
+function openPrestamoModal(id){
+  const p = id ? state.prestamos.find(x=>x.id===id) : null;
+  const yaDevolvioAlgo = p ? prestamoTieneDevolucionesRegistradas(p) : false;
+  modalContent = {
+    title: p ? 'Editar préstamo/alquiler' : 'Nuevo préstamo/alquiler',
+    bodyHtml: prestamoFormFields(p),
+    onSave: (form)=>{
+      const tercero = form.tercero.value.trim();
+      if(!tercero) return alert('Ingresá quién pidió el ítem.');
+      const admin = state.admins.find(a=>a.id===form.entregadoPor.value);
+      const data = {
+        tercero, terceroContacto: form.terceroContacto.value.trim(),
+        modalidad: form.modalidad.value,
+        monto: parseMonto(form.monto.value),
+        cajaId: form.cajaId.value || null,
+        fechaSalida: form.fechaSalida.value || todayStr(),
+        fechaEsperadaDevolucion: form.fechaEsperadaDevolucion.value || '',
+        entregadoPor: form.entregadoPor.value, entregadoPorNombre: admin ? admin.nombre : '',
+        notas: form.notas.value.trim(),
+      };
+      if(!yaDevolvioAlgo){
+        const items = state.insumos.map(i=>({ insumoId: i.id, cantidad: Number(form[`prestitem_${i.id}`].value)||0 })).filter(x=>x.cantidad>0);
+        if(items.length===0) return alert('Cargá al menos un ítem con cantidad.');
+        data.items = items;
+      }
+      // el cobro (si corresponde) sólo se crea/actualiza/quita mientras no haya devoluciones registradas todavía,
+      // igual criterio que con los ítems, para no reabrir algo que ya empezó a cerrarse
+      const corresponeCobro = data.modalidad==='alquiler' && data.monto>0 && data.cajaId;
+      if(p){
+        if(!yaDevolvioAlgo){
+          // se sacan las salidas viejas de este préstamo y se vuelven a crear con los ítems/cantidades nuevos
+          state.movimientosInsumo = state.movimientosInsumo.filter(m=>!(m.prestamoId===p.id && m.tipo==='salida'));
+          data.items.forEach(it=>{
+            state.movimientosInsumo.push({id:uid(), insumoId: it.insumoId, tipo:'salida', cantidad: it.cantidad, fecha: data.fechaSalida, prestamoId: p.id, descripcion: `Préstamo/alquiler a ${tercero}`});
+          });
+          const cobroExistente = p.cobroId ? state.cobros.find(x=>x.id===p.cobroId) : null;
+          if(corresponeCobro){
+            if(cobroExistente){
+              Object.assign(cobroExistente, { monto: data.monto, cajaId: data.cajaId, fecha: data.fechaSalida, descripcion: `Alquiler de ítems a ${tercero}` });
+            } else {
+              const cobro = { id:uid(), eventoId: null, prestamoId: p.id, fecha: data.fechaSalida, monto: data.monto, tipo:'prestamo', descripcion: `Alquiler de ítems a ${tercero}`, cajaId: data.cajaId, adminId: adminUnlocked.id };
+              state.cobros.push(cobro);
+              data.cobroId = cobro.id;
+            }
+          } else if(cobroExistente){
+            state.cobros = state.cobros.filter(x=>x.id!==cobroExistente.id);
+            data.cobroId = null;
+          }
+        }
+        Object.assign(p, data);
+        pushLog(adminUnlocked.nombre, 'Préstamo/alquiler editado', `${tercero}`);
+      } else {
+        const nuevo = Object.assign({id:uid(), devuelto:false, fechaDevolucion:null, recibidoPor:null, recibidoPorNombre:null}, data);
+        state.prestamos.push(nuevo);
+        data.items.forEach(it=>{
+          state.movimientosInsumo.push({id:uid(), insumoId: it.insumoId, tipo:'salida', cantidad: it.cantidad, fecha: data.fechaSalida, prestamoId: nuevo.id, descripcion: `Préstamo/alquiler a ${tercero}`});
+        });
+        if(corresponeCobro){
+          const cobro = { id:uid(), eventoId: null, prestamoId: nuevo.id, fecha: data.fechaSalida, monto: data.monto, tipo:'prestamo', descripcion: `Alquiler de ítems a ${tercero}`, cajaId: data.cajaId, adminId: adminUnlocked.id };
+          state.cobros.push(cobro);
+          nuevo.cobroId = cobro.id;
+        }
+        pushLog(adminUnlocked.nombre, 'Préstamo/alquiler registrado', `${tercero} — entregó ${data.entregadoPorNombre}${corresponeCobro?` — cobro de ${fmtMoney(data.monto)}`:''}`);
+      }
+      saveState(); closeModal(); render();
+    },
+    onDelete: p ? ()=>{
+      if(yaDevolvioAlgo) return alert('Este préstamo ya tiene una devolución parcial registrada, no se puede eliminar. Registrá la devolución del resto en vez de borrarlo.');
+      if(confirm(`¿Eliminar el préstamo/alquiler de "${p.tercero}"? Esto va a devolver el stock${p.cobroId?' y quitar el cobro asociado':''}.`)){
+        state.movimientosInsumo = state.movimientosInsumo.filter(m=>m.prestamoId!==p.id);
+        if(p.cobroId) state.cobros = state.cobros.filter(x=>x.id!==p.cobroId);
+        state.prestamos = state.prestamos.filter(x=>x.id!==p.id);
+        pushLog(adminUnlocked.nombre, 'Préstamo/alquiler eliminado', p.tercero);
+        saveState(); closeModal(); render();
+      }
+    } : null,
+  };
+  render();
+}
+function openDevolucionPrestamoModal(id){
+  const p = state.prestamos.find(x=>x.id===id);
+  if(!p) return;
+  const pendientes = itemsPendientesPrestamo(p).filter(it=>it.pendiente>0);
+  modalContent = {
+    title: `Registrar devolución — ${p.tercero}`,
+    bodyHtml: `
+      <div class="section-hint" style="margin-bottom:10px;">Cantidad que vuelve ahora de cada ítem (podés dejar algo afuera si vuelve solo una parte).</div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        ${pendientes.map(it=>`
+          <div class="field-row" style="align-items:center; margin-bottom:0;">
+            <div style="flex:1; font-size:0.86rem;">${it.insumo.nombre} <span class="section-hint">(pendiente: ${it.pendiente})</span></div>
+            <div class="field" style="flex:0 0 90px; margin-bottom:0;"><input type="number" step="0.1" name="devitem_${it.insumoId}" value="${it.pendiente}" max="${it.pendiente}"></div>
+          </div>
+        `).join('')}
+      </div>
+      <div class="field" style="margin-top:14px;"><label>Fecha de devolución</label><input type="date" name="fechaDevolucion" value="${todayStr()}"></div>
+      <div class="field"><label>¿Quién recibe?</label>
+        <select name="recibidoPor">
+          ${state.admins.map(a=>`<option value="${a.id}" ${adminUnlocked&&adminUnlocked.id===a.id?'selected':''}>${a.nombre}</option>`).join('')}
+        </select>
+      </div>
+    `,
+    customSubmitLabel: 'Registrar devolución',
+    onSave: (form)=>{
+      let algoDevuelto = false;
+      pendientes.forEach(it=>{
+        const cant = Number(form[`devitem_${it.insumoId}`].value)||0;
+        if(cant<=0) return;
+        const real = Math.min(cant, it.pendiente);
+        state.movimientosInsumo.push({id:uid(), insumoId: it.insumoId, tipo:'entrada', cantidad: real, fecha: form.fechaDevolucion.value || todayStr(), prestamoId: p.id, descripcion: `Devolución de ${p.tercero}`});
+        algoDevuelto = true;
+      });
+      if(!algoDevuelto) return alert('Ingresá al menos una cantidad para registrar la devolución.');
+      const pendienteAhora = itemsPendientesPrestamo(p).filter(it=>it.pendiente>0);
+      if(pendienteAhora.length===0){
+        const admin = state.admins.find(a=>a.id===form.recibidoPor.value);
+        p.devuelto = true;
+        p.fechaDevolucion = form.fechaDevolucion.value || todayStr();
+        p.recibidoPor = form.recibidoPor.value;
+        p.recibidoPorNombre = admin ? admin.nombre : '';
+      }
+      pushLog(adminUnlocked.nombre, 'Devolución de préstamo/alquiler registrada', `${p.tercero}${pendienteAhora.length===0?' — completo':' — parcial'}`);
+      saveState(); closeModal(); render();
+    },
+  };
+  render();
+}
+
 function insumoFormFields(i){
   i = i || {};
   return `
@@ -5350,6 +5634,11 @@ function bindPanelEvents(){
   if(btnNuevoKit) btnNuevoKit.addEventListener('click', ()=>openKitModal(null));
   panel.querySelectorAll('[data-open-kit]').forEach(b=>b.addEventListener('click', ()=>openKitModal(b.dataset.openKit)));
 
+  const btnNuevoPrestamo = document.getElementById('btnNuevoPrestamo');
+  if(btnNuevoPrestamo) btnNuevoPrestamo.addEventListener('click', ()=>openPrestamoModal(null));
+  panel.querySelectorAll('[data-open-prestamo]').forEach(b=>b.addEventListener('click', ()=>openPrestamoModal(b.dataset.openPrestamo)));
+  panel.querySelectorAll('[data-devolver-prestamo]').forEach(b=>b.addEventListener('click', ()=>openDevolucionPrestamoModal(b.dataset.devolverPrestamo)));
+
   const dispFecha = document.getElementById('dispFecha');
   if(dispFecha) dispFecha.addEventListener('change', ()=>{ disponibilidadFecha = dispFecha.value; renderPanel(); });
 
@@ -5397,7 +5686,7 @@ function bindPanelEvents(){
       insumos: state.insumos, movimientosInsumo: state.movimientosInsumo,
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
-      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits,
+      cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
     }, null, 2);
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -5440,6 +5729,7 @@ function bindPanelEvents(){
         state.rolesExtra = parsed.rolesExtra || [];
         state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
         state.kits = parsed.kits || [];
+        state.prestamos = parsed.prestamos || [];
         if(parsed.admins && parsed.admins.length) state.admins = parsed.admins;
         if(parsed.log && parsed.log.length) state.log = parsed.log;
         pushLog(adminUnlocked.nombre, 'Importó copia de seguridad completa', file.name);
@@ -5478,7 +5768,7 @@ function renderLanding(){
     appMode = 'colaborador';
     const app2 = document.getElementById('app');
     app2.innerHTML = `<div class="loading">Cargando datos de Blend…</div>`;
-    const failSafe = setTimeout(()=>{ storageOk = false; renderColaboradorLogin(); }, 7000);
+    const failSafe = setTimeout(()=>{ storageOk = false; renderColaboradorLogin(); }, 18000);
     await loadState();
     clearTimeout(failSafe);
     renderColaboradorLogin();
@@ -5487,7 +5777,7 @@ function renderLanding(){
     appMode = 'admin';
     const app2 = document.getElementById('app');
     app2.innerHTML = `<div class="loading">Cargando datos de Blend…</div>`;
-    const failSafe = setTimeout(()=>{ storageOk = false; render(); }, 7000);
+    const failSafe = setTimeout(()=>{ storageOk = false; render(); }, 18000);
     await loadState();
     clearTimeout(failSafe);
     render();
