@@ -993,7 +993,7 @@ async function saveState(intentoNro){
     if(firebase.auth && !firebase.auth().currentUser){
       try{ await firebase.auth().signInAnonymously(); }catch(authErr){ console.warn('No se pudo reautenticar antes de guardar', authErr); }
     }
-    await db.collection('blend').doc('data').set({
+    const payload = {
       eventos: state.eventos, personal: state.personal, produccion: state.produccion,
       compras: state.compras, gastos: state.gastos, pagos: state.pagos,
       admins: state.admins, log: state.log, tarifas: state.tarifas, tarifasFueraAsuncion: state.tarifasFueraAsuncion, cajas: state.cajas,
@@ -1003,7 +1003,11 @@ async function saveState(intentoNro){
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
       cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
-    });
+    };
+    // red de seguridad: Firestore rechaza el documento ENTERO si algún campo, en cualquier parte, quedó en "undefined"
+    // (fue justo lo que pasó con un campo nuevo de préstamos). Este viaje por JSON limpia cualquier "undefined" a null/omitido
+    // así un descuido futuro en un campo nunca vuelve a tirar abajo el guardado de todo lo demás.
+    await db.collection('blend').doc('data').set(JSON.parse(JSON.stringify(payload)));
     const huboError = !storageOk;
     storageOk = true;
     ultimoErrorGuardado = null;
@@ -4237,7 +4241,7 @@ function openPrestamoModal(id){
         Object.assign(p, data);
         pushLog(adminUnlocked.nombre, 'Préstamo/alquiler editado', `${tercero}`);
       } else {
-        const nuevo = Object.assign({id:uid(), devuelto:false, fechaDevolucion:null, recibidoPor:null, recibidoPorNombre:null}, data);
+        const nuevo = Object.assign({id:uid(), devuelto:false, fechaDevolucion:null, recibidoPor:null, recibidoPorNombre:null, cobroId:null}, data);
         state.prestamos.push(nuevo);
         data.items.forEach(it=>{
           state.movimientosInsumo.push({id:uid(), insumoId: it.insumoId, tipo:'salida', cantidad: it.cantidad, fecha: data.fechaSalida, prestamoId: nuevo.id, descripcion: `Préstamo/alquiler a ${tercero}`});
