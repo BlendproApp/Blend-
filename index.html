@@ -3889,10 +3889,10 @@ function compraFormFields(c){
       </div>
       <div class="field"><label>Cantidad que ingresa</label><input type="number" step="0.1" name="insumoCantidad" id="compraInsumoCantidad" value="${c.insumoCantidad||''}" ${bloqueadoStock?'disabled':''}></div>
     </div>
-    <div id="compraNuevoItemInline" style="margin:-6px 0 14px;">
+    <div id="compraNuevoItemInline" style="margin:-6px 0 4px;">
       ${bloqueadoStock?'':'<button type="button" class="btn small ghost" id="btnCompraNuevoItem">+ El ítem no está en mi inventario — crearlo</button>'}
     </div>
-    ${bloqueadoStock?'<div class="section-hint">El ítem y la cantidad no se pueden editar una vez creada la compra (para no desajustar el stock). Si te equivocaste, eliminá este registro y cargalo de nuevo.</div>':''}
+    ${bloqueadoStock?'<div class="section-hint">El ítem y la cantidad no se pueden editar una vez creada la compra (para no desajustar el stock). Si te equivocaste, eliminá este registro y cargalo de nuevo.</div>':'<div class="section-hint" style="margin-top:0; margin-bottom:14px;">Completá el nombre del ítem nuevo y guardá la compra — se crea solo, sin pasos extra.</div>'}
   `;
 }
 function openCompraModal(id){
@@ -3953,8 +3953,22 @@ function openCompraModal(id){
       if(bloqueadoStock){
         data.insumoId = c.insumoId; data.insumoCantidad = c.insumoCantidad;
       } else {
-        data.insumoId = form.insumoId.value || null;
-        data.insumoCantidad = Number(form.insumoCantidad.value)||0;
+        // si quedó completo el campo de "ítem nuevo" pero no se tocó el botón "Agregar y usar" antes de guardar,
+        // lo creamos igual acá — para que no se pierda solo por no haber hecho ese paso extra.
+        const nuevoItemNombreInput = form.querySelector('#compraNuevoItemNombre');
+        if(nuevoItemNombreInput && nuevoItemNombreInput.value.trim()){
+          const nombreNuevo = nuevoItemNombreInput.value.trim();
+          const unidadNuevo = ((form.querySelector('#compraNuevoItemUnidad')||{}).value||'').trim();
+          const tipoNuevo = (form.querySelector('#compraNuevoItemTipo')||{}).value || 'consumible';
+          const nuevoInsumo = {id:uid(), nombre: nombreNuevo, unidad: unidadNuevo, stockInicial:0, stockMinimo:'', tipo: tipoNuevo};
+          state.insumos.push(nuevoInsumo);
+          pushLog(adminUnlocked.nombre, 'Insumo agregado', `${nombreNuevo} (creado desde Compras)`);
+          data.insumoId = nuevoInsumo.id;
+          data.insumoCantidad = Number(form.insumoCantidad.value)||0;
+        } else {
+          data.insumoId = form.insumoId.value || null;
+          data.insumoCantidad = Number(form.insumoCantidad.value)||0;
+        }
       }
       const evNombre = data.eventoId ? ((eventosDe(data.eventoId)||{}).lugar || '(sin lugar)') : 'Empresa';
       const cajaNombre = (state.cajas.find(x=>x.id===data.cajaId)||{}).nombre || '';
