@@ -3828,18 +3828,19 @@ function renderCompras(){
   const rows = [...state.compras].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   return `
     <div class="row-between">
-      <div><h2 class="section-title">Compras</h2><div class="section-hint">Compras por evento — se descuentan de lo ingresado por ese evento y de la caja elegida.</div></div>
-      <button class="btn" id="btnNuevaCompra" ${(state.eventos.length===0||state.cajas.length===0)?'disabled title="Cargá un evento y una caja primero"':''}>+ Nueva compra</button>
+      <div><h2 class="section-title">Compras</h2><div class="section-hint">Compras de la empresa en general o de un evento en particular — se descuentan de la caja elegida (y, si corresponde, del balance de ese evento).</div></div>
+      <button class="btn" id="btnNuevaCompra" ${state.cajas.length===0?'disabled title="Creá una caja primero"':''}>+ Nueva compra</button>
     </div>
-    ${state.eventos.length===0 ? '<div class="empty">Cargá al menos un evento para poder registrar compras.</div>' : (state.cajas.length===0 ? '<div class="empty">Creá al menos una caja en "Cajas" antes de registrar compras.</div>' : (rows.length===0 ? '<div class="empty">No hay compras registradas.</div>' : `
+    ${state.cajas.length===0 ? '<div class="empty">Creá al menos una caja en "Cajas" antes de registrar compras.</div>' : (rows.length===0 ? '<div class="empty">No hay compras registradas.</div>' : `
     <div class="card" style="padding:0; overflow-x:auto;">
     <table>
-      <thead><tr><th>Fecha</th><th>Evento</th><th>Caja</th><th>Descripción</th><th>Categoría</th><th>Cargado por</th><th>Monto</th><th></th></tr></thead>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Evento</th><th>Caja</th><th>Descripción</th><th>Categoría</th><th>Cargado por</th><th>Monto</th><th></th></tr></thead>
       <tbody>
-      ${rows.map(c=>{ const ev = eventosDe(c.eventoId); const caja = state.cajas.find(x=>x.id===c.cajaId); const adminC = state.admins.find(a=>a.id===c.adminId); return `
+      ${rows.map(c=>{ const ev = c.eventoId ? eventosDe(c.eventoId) : null; const caja = state.cajas.find(x=>x.id===c.cajaId); const adminC = state.admins.find(a=>a.id===c.adminId); return `
         <tr>
           <td>${fmtDate(c.fecha)}</td>
-          <td>${ev?ev.lugar||'(sin lugar)':'(evento eliminado)'}</td>
+          <td><span class="badge ${c.eventoId?'posible':'senado'}">${c.eventoId?'Evento':'Empresa'}</span></td>
+          <td>${c.eventoId ? (ev?ev.lugar||'(sin lugar)':'(evento eliminado)') : '—'}</td>
           <td>${caja?caja.nombre:'—'}</td>
           <td>${c.descripcion||'—'}</td>
           <td>${c.categoria||'—'}</td>
@@ -3850,15 +3851,25 @@ function renderCompras(){
       `;}).join('')}
       </tbody>
     </table>
-    </div>`))}
+    </div>`)}
   `;
 }
 function compraFormFields(c){
   c = c || {};
   const cajaSugerida = c.cajaId || (state.cajas.find(cc=>cc.administradorId===(adminUnlocked&&adminUnlocked.id))||{}).id || '';
+  const tipoCompra = c.tipo || (c.eventoId ? 'evento' : 'empresa');
+  const bloqueadoStock = !!(c.id && c.insumoId);
   return `
-    <div class="field"><label>Evento</label>
-      <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${c.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
+    <div class="field-row">
+      <div class="field"><label>Tipo</label>
+        <select name="tipoCompra" id="compraTipo">
+          <option value="empresa" ${tipoCompra==='empresa'?'selected':''}>Empresa (no es de un evento en particular)</option>
+          <option value="evento" ${tipoCompra==='evento'?'selected':''}>Evento</option>
+        </select>
+      </div>
+      <div class="field" id="compraEventoWrap" style="${tipoCompra==='evento'?'':'display:none;'}"><label>Evento</label>
+        <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${c.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
+      </div>
     </div>
     <div class="field-row">
       <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${c.fecha||todayStr()}"></div>
@@ -3869,13 +3880,19 @@ function compraFormFields(c){
     </div>
     <div class="field"><label>Descripción</label><input type="text" name="descripcion" value="${c.descripcion||''}" placeholder="Ítems, hielo, decoración…"></div>
     <div class="field"><label>Categoría (opcional)</label><input type="text" name="categoria" value="${c.categoria||''}"></div>
-    ${state.insumos.length>0 ? `
     <div class="field-row">
       <div class="field"><label>¿Suma stock de un ítem? (opcional)</label>
-        <select name="insumoId"><option value="">— No —</option>${state.insumos.map(i=>`<option value="${i.id}" ${c.insumoId===i.id?'selected':''}>${i.nombre}</option>`).join('')}</select>
+        <select name="insumoId" id="compraInsumoSelect" ${bloqueadoStock?'disabled':''}>
+          <option value="">— No —</option>
+          ${state.insumos.map(i=>`<option value="${i.id}" ${c.insumoId===i.id?'selected':''}>${i.nombre}${i.unidad?' ('+i.unidad+')':''}</option>`).join('')}
+        </select>
       </div>
-      <div class="field"><label>Cantidad que ingresa</label><input type="number" name="insumoCantidad" value="${c.insumoCantidad||''}"></div>
-    </div>` : ''}
+      <div class="field"><label>Cantidad que ingresa</label><input type="number" step="0.1" name="insumoCantidad" id="compraInsumoCantidad" value="${c.insumoCantidad||''}" ${bloqueadoStock?'disabled':''}></div>
+    </div>
+    <div id="compraNuevoItemInline" style="margin:-6px 0 14px;">
+      ${bloqueadoStock?'':'<button type="button" class="btn small ghost" id="btnCompraNuevoItem">+ El ítem no está en mi inventario — crearlo</button>'}
+    </div>
+    ${bloqueadoStock?'<div class="section-hint">El ítem y la cantidad no se pueden editar una vez creada la compra (para no desajustar el stock). Si te equivocaste, eliminá este registro y cargalo de nuevo.</div>':''}
   `;
 }
 function openCompraModal(id){
@@ -3883,28 +3900,85 @@ function openCompraModal(id){
   modalContent = {
     title: c ? 'Editar compra' : 'Nueva compra',
     bodyHtml: compraFormFields(c),
+    afterRender: (modalEl)=>{
+      const tipoSel = modalEl.querySelector('#compraTipo');
+      const wrap = modalEl.querySelector('#compraEventoWrap');
+      tipoSel.addEventListener('change', ()=>{ wrap.style.display = tipoSel.value==='evento' ? '' : 'none'; });
+
+      const btnNuevoItem = modalEl.querySelector('#btnCompraNuevoItem');
+      if(btnNuevoItem){
+        btnNuevoItem.addEventListener('click', ()=>{
+          const wrapNuevo = modalEl.querySelector('#compraNuevoItemInline');
+          wrapNuevo.innerHTML = `
+            <div class="field-row" style="align-items:flex-end;">
+              <div class="field" style="margin-bottom:0;"><label>Nombre del ítem nuevo</label><input type="text" id="compraNuevoItemNombre" placeholder="Ej: Whisky"></div>
+              <div class="field" style="margin-bottom:0;"><label>Unidad</label><input type="text" id="compraNuevoItemUnidad" placeholder="Botellas, kg, litros…"></div>
+              <div class="field" style="margin-bottom:0;"><label>Tipo</label>
+                <select id="compraNuevoItemTipo">
+                  <option value="consumible">Consumible</option>
+                  <option value="herramienta">Herramienta</option>
+                </select>
+              </div>
+            </div>
+            <button type="button" class="btn small" id="btnGuardarCompraNuevoItem" style="margin-top:8px;">Agregar y usar en esta compra</button>
+          `;
+          wrapNuevo.querySelector('#btnGuardarCompraNuevoItem').addEventListener('click', ()=>{
+            const nombre = wrapNuevo.querySelector('#compraNuevoItemNombre').value.trim();
+            if(!nombre) return alert('Ingresá un nombre para el ítem.');
+            const unidad = wrapNuevo.querySelector('#compraNuevoItemUnidad').value.trim();
+            const tipo = wrapNuevo.querySelector('#compraNuevoItemTipo').value;
+            const nuevoInsumo = {id:uid(), nombre, unidad, stockInicial:0, stockMinimo:'', tipo};
+            state.insumos.push(nuevoInsumo);
+            pushLog(adminUnlocked.nombre, 'Insumo agregado', `${nombre} (creado desde Compras)`);
+            saveState();
+            const sel = modalEl.querySelector('#compraInsumoSelect');
+            sel.innerHTML = `<option value="">— No —</option>${state.insumos.map(i=>`<option value="${i.id}" ${i.id===nuevoInsumo.id?'selected':''}>${i.nombre}${i.unidad?' ('+i.unidad+')':''}</option>`).join('')}`;
+            wrapNuevo.innerHTML = `<button type="button" class="btn small ghost" id="btnCompraNuevoItem">+ El ítem no está en mi inventario — crearlo</button>`;
+            wrapNuevo.querySelector('#btnCompraNuevoItem').addEventListener('click', ()=> btnNuevoItem.click());
+          });
+        });
+      }
+    },
     onSave: (form)=>{
+      const tipoCompra = form.tipoCompra.value;
+      if(tipoCompra==='evento' && !form.eventoId.value){ alert('Elegí el evento, o cambiá el tipo a "Empresa" si esta compra no es de un evento en particular.'); return; }
       const data = {
-        eventoId: form.eventoId.value, fecha: form.fecha.value, monto: parseMonto(form.monto.value),
+        tipo: tipoCompra,
+        eventoId: tipoCompra==='evento' ? form.eventoId.value : null,
+        fecha: form.fecha.value, monto: parseMonto(form.monto.value),
         descripcion: form.descripcion.value.trim(), categoria: form.categoria.value.trim(),
         cajaId: form.cajaId.value, adminId: c ? c.adminId : adminUnlocked.id,
       };
-      const evNombre = (eventosDe(data.eventoId)||{}).lugar || '(sin lugar)';
+      const bloqueadoStock = !!(c && c.id && c.insumoId);
+      if(bloqueadoStock){
+        data.insumoId = c.insumoId; data.insumoCantidad = c.insumoCantidad;
+      } else {
+        data.insumoId = form.insumoId.value || null;
+        data.insumoCantidad = Number(form.insumoCantidad.value)||0;
+      }
+      const evNombre = data.eventoId ? ((eventosDe(data.eventoId)||{}).lugar || '(sin lugar)') : 'Empresa';
       const cajaNombre = (state.cajas.find(x=>x.id===data.cajaId)||{}).nombre || '';
-      if(c){ Object.assign(c, data); pushLog(adminUnlocked.nombre, 'Compra editada', `${fmtMoney(data.monto)} — ${evNombre} — ${cajaNombre}`); }
+      let compraObj;
+      if(c){ Object.assign(c, data); compraObj = c; pushLog(adminUnlocked.nombre, 'Compra editada', `${fmtMoney(data.monto)} — ${evNombre} — ${cajaNombre}`); }
       else {
-        state.compras.push(Object.assign({id:uid()}, data));
+        compraObj = Object.assign({id:uid()}, data);
+        state.compras.push(compraObj);
         pushLog(adminUnlocked.nombre, 'Compra registrada', `${fmtMoney(data.monto)} — ${evNombre} — ${cajaNombre}`);
       }
-      if(form.insumoId && form.insumoId.value && Number(form.insumoCantidad.value)>0){
-        const ins = state.insumos.find(i=>i.id===form.insumoId.value);
-        state.movimientosInsumo.push({id:uid(), insumoId: form.insumoId.value, tipo:'entrada', cantidad: form.insumoCantidad.value, fecha: data.fecha, descripcion: 'Compra: '+data.descripcion});
-        pushLog(adminUnlocked.nombre, 'Stock sumado por compra', `${ins?ins.nombre:''} +${form.insumoCantidad.value}`);
+      if(!bloqueadoStock && data.insumoId && data.insumoCantidad>0){
+        const ins = state.insumos.find(i=>i.id===data.insumoId);
+        state.movimientosInsumo.push({id:uid(), insumoId: data.insumoId, tipo:'entrada', cantidad: data.insumoCantidad, fecha: data.fecha, compraId: compraObj.id, descripcion: 'Compra: '+(data.descripcion||'')});
+        pushLog(adminUnlocked.nombre, 'Stock sumado por compra', `${ins?ins.nombre:''} +${data.insumoCantidad}`);
       }
       saveState(); closeModal(); render();
     },
     onDelete: c ? ()=>{
-      if(confirm('¿Eliminar esta compra?')){ state.compras = state.compras.filter(x=>x.id!==c.id); pushLog(adminUnlocked.nombre, 'Compra eliminada', fmtMoney(c.monto)); saveState(); closeModal(); render(); }
+      if(confirm('¿Eliminar esta compra?')){
+        if(c.insumoId){ state.movimientosInsumo = state.movimientosInsumo.filter(m=>m.compraId!==c.id); }
+        state.compras = state.compras.filter(x=>x.id!==c.id);
+        pushLog(adminUnlocked.nombre, 'Compra eliminada', fmtMoney(c.monto));
+        saveState(); closeModal(); render();
+      }
     } : null,
   };
   render();
