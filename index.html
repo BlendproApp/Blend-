@@ -1056,7 +1056,7 @@ function interpolar(valor, puntos){
   }
   return puntos[puntos.length-1][1]; // plano después del último punto
 }
-const TABLA_PRECIO_PERSONA = [[100,75000],[200,72500],[300,70000]];
+const TABLA_PRECIO_PERSONA = [[10,120000],[20,120000],[30,110000],[40,100000],[50,90000],[60,90000],[70,85000],[80,80000],[90,75000],[100,75000],[200,72500],[300,70000]];
 const TABLA_PRECIO_TRAGO = [[100,35000],[200,33000],[300,30000],[400,28000]];
 const PRECIO_TRAGO_ADICIONAL_FIJO = 35000;
 const HORAS_BASE_POLITICA = 6;
@@ -1376,7 +1376,7 @@ function render(){
     ]},
     { id: 'finanzas', label: 'Finanzas', icon: '◉', tabs: [
       ['compras','Compras'],
-      ['gastos','Gastos e Inversiones'],
+      ['gastos','Gastos e Ingresos'],
       ['cobros','Cobros'],
       ['cajas','Cajas'],
     ]},
@@ -1889,6 +1889,95 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
   const campoInicial = ev || ((prefillFecha||prefillDegustacionFecha) ? {estado:'posible', pagadoTotal:false, fecha:prefillFecha||'', degustacionFecha:prefillDegustacionFecha||''} : null);
   let tragosSeleccionados = new Set(ev ? (ev.tragosIds||[]) : []);
   let personalSeleccionado = new Set(ev ? (ev.personalAsignado||[]) : []);
+
+  function leerTiersEv(container){
+    if(!container) return [];
+    const tiers = [];
+    container.querySelectorAll('[data-tier-block]').forEach(block=>{
+      const cantidad = Number(block.querySelector('input[name$="_cantidad"]').value)||0;
+      const precio = parseMonto(block.querySelector('input[name$="_precio"]').value);
+      if(cantidad>0) tiers.push({cantidad, precio});
+    });
+    return tiers;
+  }
+  function construirDatosEvento(form){
+    const adultos = Number(form.adultos.value)||0;
+    const jovenes = Number(form.jovenes.value)||0;
+    return {
+      estado: form.estado.value,
+      fecha: form.fecha.value,
+      lugar: form.lugar.value.trim(),
+      tipoEvento: form.tipoEvento.value,
+      horasEvento: form.horasEvento.value,
+      horarioInicio: form.horarioInicio.value,
+      horarioMontaje: form.horarioMontaje.value,
+      precioHoraAdicionalEvento: parseMonto(form.precioHoraAdicionalEvento.value),
+      precioTragoAdicionalEvento: parseMonto(form.precioTragoAdicionalEvento.value),
+      adultos, jovenes,
+      cantidadPersonas: adultos + jovenes,
+      tragosConAlcohol: leerTiersEv(form.querySelector('#evTragosConContainer')),
+      tragosSinAlcohol: leerTiersEv(form.querySelector('#evTragosSinContainer')),
+      tragos: form.tragos.value.trim(),
+      tragosIds: Array.from(tragosSeleccionados),
+      personalAsignado: Array.from(personalSeleccionado),
+      observaciones: form.observaciones.value.trim(),
+      montoTotal: parseMonto(form.montoTotal.value),
+      senaPercent: form.senaPercent.value,
+      pagadoTotal: form.pagadoTotal.checked,
+      planner: form.planner.value.trim(),
+      comisionPlannerPercent: form.comisionPlannerPercent.value,
+      comisionPagada: form.comisionPagada ? form.comisionPagada.checked : (ev?ev.comisionPagada:false),
+      degustacionFecha: form.degustacionFecha.value,
+      reunionPlannerFecha: form.reunionPlannerFecha.value,
+      fueraAsuncion: form.fueraAsuncion.checked,
+    };
+  }
+  function persistirEvento(data){
+    const personalAnterior = ev ? (ev.personalAsignado||[]) : [];
+    let eventoObj;
+    if(ev){ Object.assign(ev, data); eventoObj = ev; pushLog(adminUnlocked.nombre, 'Evento editado', `${data.lugar||'(sin lugar)'} — ${fmtDate(data.fecha)}`); }
+    else { eventoObj = Object.assign({id:uid(), createdAt: Date.now()}, data); state.eventos.push(eventoObj); pushLog(adminUnlocked.nombre, 'Evento creado', `${data.lugar||'(sin lugar)'} — ${fmtDate(data.fecha)}`); }
+
+    // generar pendiente de pago automático para el personal recién asignado
+    const nuevosIds = data.personalAsignado.filter(pid=>!personalAnterior.includes(pid));
+    const horasNum = Number(data.horasEvento)||0;
+    const horasExtra = horasNum>6 ? horasNum-6 : 0;
+    nuevosIds.forEach(pid=>{
+      const yaExiste = state.produccion.some(r=>r.eventoId===eventoObj.id && r.personaId===pid);
+      if(yaExiste) return;
+      const persona = personaDe(pid);
+      const funcion = persona ? persona.rol : '';
+      state.produccion.push({
+        id: uid(), personaId: pid, funcion, fecha: data.fecha,
+        fueraAsuncion: data.fueraAsuncion, eventoId: eventoObj.id,
+        descripcion: data.fueraAsuncion
+          ? `Evento: ${data.lugar||'(sin lugar)'} — fuera de Asunción, cargar monto manualmente`
+          : `Evento: ${data.lugar||'(sin lugar)'} — generado automáticamente`,
+        tarifaBase: data.fueraAsuncion ? 0 : tarifaPara(persona, funcion, false),
+        extensionTipo: 'ninguna', extensionMonto: 0, extensionDescripcion: '',
+        horasExtra, tragosExtraCantidad: 0, tragosExtraBartenders: 1,
+        pagado: false,
+      });
+    });
+    if(nuevosIds.length>0){
+      pushLog(adminUnlocked.nombre, 'Personal marcado pendiente de pago', `${nuevosIds.length} persona(s) — ${data.lugar||'(sin lugar)'}`);
+    }
+    return eventoObj;
+  }
+  function manejarSenaAutomatica(eventoObj, data){
+    const montoTotalNum = Number(data.montoTotal)||0;
+    const senaPercentNum = Number(data.senaPercent)||0;
+    const montoSenaCalc = (montoTotalNum>0 && senaPercentNum>0) ? Math.round(montoTotalNum * senaPercentNum/100) : 0;
+    if(montoSenaCalc<=0) return;
+    const yaTieneSenaRegistrada = state.cobros.some(c=>c.eventoId===eventoObj.id && c.origenSena);
+    if(yaTieneSenaRegistrada) return;
+    if(!confirm(`Este evento tiene una seña del ${senaPercentNum}% sobre ${fmtMoney(montoTotalNum)} = ${fmtMoney(montoSenaCalc)}.\n¿Registrar este cobro ahora?`)) return;
+    if(state.cajas.length===0){ alert('Creá al menos una caja (pestaña "Cajas") para poder registrar el cobro de la seña. El evento se guardó, pero el cobro no se registró.'); return; }
+    const cajaSugerida = state.cajas.find(c=>c.administradorId===(adminUnlocked&&adminUnlocked.id)) || state.cajas[0];
+    state.cobros.push({id:uid(), eventoId: eventoObj.id, fecha: todayStr(), monto: montoSenaCalc, tipo:'cliente', descripcion:`Seña (${senaPercentNum}%)`, cajaId: cajaSugerida.id, adminId: adminUnlocked.id, origenSena:true});
+    pushLog(adminUnlocked.nombre, 'Cobro de seña registrado', `${fmtMoney(montoSenaCalc)} — ${eventoObj.lugar||'(sin lugar)'}`);
+  }
+
   modalContent = {
     title: ev ? 'Editar evento' : 'Nuevo evento',
     bodyHtml: eventoFormFields(campoInicial) + personalChipHtml(personalSeleccionado, campoInicial),
@@ -2021,17 +2110,24 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
         if(btnCobro){
           btnCobro.addEventListener('click', ()=>{
             const cf = modalEl.querySelector('#cobroForm');
-            const monto = cf.querySelector('[name="monto"]').value;
-            if(!monto) return;
-            const fecha = cf.querySelector('[name="fechaCobro"]').value;
+            const monto = parseMonto(cf.querySelector('[name="monto"]').value);
+            if(!monto || monto<=0){ alert('Cargá un monto válido.'); return; }
+            if(state.cajas.length===0){ alert('Creá al menos una caja (pestaña "Cajas") antes de registrar un cobro.'); return; }
+            if(!confirm(`¿Confirmás registrar un cobro de ${fmtMoney(monto)} para este evento?`)) return;
+            // primero se guardan los cambios del formulario principal (monto total, seña, etc.) para no perderlos
+            const formPrincipal = modalEl.querySelector('#modalForm');
+            const data = construirDatosEvento(formPrincipal);
+            const eventoObj = persistirEvento(data);
+            const fecha = cf.querySelector('[name="fechaCobro"]').value || todayStr();
             const tipo = cf.querySelector('[name="tipo"]').value;
             const descripcion = cf.querySelector('[name="descripcion"]').value.trim();
             const cajaSel = cf.querySelector('[name="cajaId"]');
-            const cajaId = cajaSel ? cajaSel.value : null;
-            state.cobros.push({id:uid(), eventoId: ev.id, fecha, monto, tipo, descripcion, cajaId, adminId: adminUnlocked.id});
+            const cajaId = cajaSel ? cajaSel.value : state.cajas[0].id;
+            state.cobros.push({id:uid(), eventoId: eventoObj.id, fecha, monto, tipo, descripcion, cajaId, adminId: adminUnlocked.id});
             const cajaNombre = (state.cajas.find(x=>x.id===cajaId)||{}).nombre || '';
-            pushLog(adminUnlocked.nombre, 'Cobro registrado', `${fmtMoney(monto)} (${tipo}) — ${ev.lugar||'(sin lugar)'} — ${cajaNombre}`);
-            saveState(); closeModal(); render();
+            pushLog(adminUnlocked.nombre, 'Cobro registrado', `${fmtMoney(monto)} (${tipo}) — ${eventoObj.lugar||'(sin lugar)'} — ${cajaNombre}`);
+            saveState();
+            openEventoModal(eventoObj.id);
           });
         }
         const btnConsumo = modalEl.querySelector('#btnAgregarConsumo');
@@ -2117,76 +2213,9 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
       }
     },
     onSave: (form)=>{
-      function leerTiers(container){
-        if(!container) return [];
-        const tiers = [];
-        container.querySelectorAll('[data-tier-block]').forEach(block=>{
-          const cantidad = Number(block.querySelector('input[name$="_cantidad"]').value)||0;
-          const precio = parseMonto(block.querySelector('input[name$="_precio"]').value);
-          if(cantidad>0) tiers.push({cantidad, precio});
-        });
-        return tiers;
-      }
-      const adultos = Number(form.adultos.value)||0;
-      const jovenes = Number(form.jovenes.value)||0;
-      const data = {
-        estado: form.estado.value,
-        fecha: form.fecha.value,
-        lugar: form.lugar.value.trim(),
-        tipoEvento: form.tipoEvento.value,
-        horasEvento: form.horasEvento.value,
-        horarioInicio: form.horarioInicio.value,
-        horarioMontaje: form.horarioMontaje.value,
-        precioHoraAdicionalEvento: parseMonto(form.precioHoraAdicionalEvento.value),
-        precioTragoAdicionalEvento: parseMonto(form.precioTragoAdicionalEvento.value),
-        adultos, jovenes,
-        cantidadPersonas: adultos + jovenes,
-        tragosConAlcohol: leerTiers(form.querySelector('#evTragosConContainer')),
-        tragosSinAlcohol: leerTiers(form.querySelector('#evTragosSinContainer')),
-        tragos: form.tragos.value.trim(),
-        tragosIds: Array.from(tragosSeleccionados),
-        personalAsignado: Array.from(personalSeleccionado),
-        observaciones: form.observaciones.value.trim(),
-        montoTotal: parseMonto(form.montoTotal.value),
-        senaPercent: form.senaPercent.value,
-        pagadoTotal: form.pagadoTotal.checked,
-        planner: form.planner.value.trim(),
-        comisionPlannerPercent: form.comisionPlannerPercent.value,
-        comisionPagada: form.comisionPagada ? form.comisionPagada.checked : (ev?ev.comisionPagada:false),
-        degustacionFecha: form.degustacionFecha.value,
-        reunionPlannerFecha: form.reunionPlannerFecha.value,
-        fueraAsuncion: form.fueraAsuncion.checked,
-      };
-      const personalAnterior = ev ? (ev.personalAsignado||[]) : [];
-      let eventoObj;
-      if(ev){ Object.assign(ev, data); eventoObj = ev; pushLog(adminUnlocked.nombre, 'Evento editado', `${data.lugar||'(sin lugar)'} — ${fmtDate(data.fecha)}`); }
-      else { eventoObj = Object.assign({id:uid(), createdAt: Date.now()}, data); state.eventos.push(eventoObj); pushLog(adminUnlocked.nombre, 'Evento creado', `${data.lugar||'(sin lugar)'} — ${fmtDate(data.fecha)}`); }
-
-      // generar pendiente de pago automático para el personal recién asignado
-      const nuevosIds = data.personalAsignado.filter(pid=>!personalAnterior.includes(pid));
-      const horasNum = Number(data.horasEvento)||0;
-      const horasExtra = horasNum>6 ? horasNum-6 : 0;
-      nuevosIds.forEach(pid=>{
-        const yaExiste = state.produccion.some(r=>r.eventoId===eventoObj.id && r.personaId===pid);
-        if(yaExiste) return;
-        const persona = personaDe(pid);
-        const funcion = persona ? persona.rol : '';
-        state.produccion.push({
-          id: uid(), personaId: pid, funcion, fecha: data.fecha,
-          fueraAsuncion: data.fueraAsuncion, eventoId: eventoObj.id,
-          descripcion: data.fueraAsuncion
-            ? `Evento: ${data.lugar||'(sin lugar)'} — fuera de Asunción, cargar monto manualmente`
-            : `Evento: ${data.lugar||'(sin lugar)'} — generado automáticamente`,
-          tarifaBase: data.fueraAsuncion ? 0 : tarifaPara(persona, funcion, false),
-          extensionTipo: 'ninguna', extensionMonto: 0, extensionDescripcion: '',
-          horasExtra, tragosExtraCantidad: 0, tragosExtraBartenders: 1,
-          pagado: false,
-        });
-      });
-      if(nuevosIds.length>0){
-        pushLog(adminUnlocked.nombre, 'Personal marcado pendiente de pago', `${nuevosIds.length} persona(s) — ${data.lugar||'(sin lugar)'}`);
-      }
-
+      const data = construirDatosEvento(form);
+      const eventoObj = persistirEvento(data);
+      manejarSenaAutomatica(eventoObj, data);
       saveState(); closeModal(); render();
     },
     onDelete: ev ? ()=>{
@@ -2605,7 +2634,11 @@ function renderPresupuestos(){
           <td>${p.nombreEvento||p.cliente||'—'}</td>
           <td>${fmtDate(p.fecha)}</td>
           <td>${p.ciudad?p.ciudad+' — ':''}${p.lugar||'—'}</td>
-          <td><button class="btn small ghost" data-ver-presupuesto="${p.id}">Ver / Imprimir</button></td>
+          <td style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn small ghost" data-ver-presupuesto="${p.id}">Ver / Imprimir</button>
+            <button class="btn small ghost" data-editar-presupuesto="${p.id}">Editar</button>
+            <button class="btn small danger" data-eliminar-presupuesto="${p.id}">Eliminar</button>
+          </td>
         </tr>
       `).join('')}
       </tbody>
@@ -2667,39 +2700,40 @@ function tierBlockHtml(prefix, idx, precioDefault, vals){
     </div>
   `;
 }
-function presupuestoFormFields(){
+function presupuestoFormFields(p){
   const cfg = state.presupuestoConfig || seedPresupuestoConfig();
+  const zonaIdxActual = p ? cfg.zonas.findIndex(z=>z.nombre===p.zonaNombre) : -1;
   return `
     <div class="field"><label>Evento (opcional — para prellenar)</label>
       <select id="pEvento">
         <option value="">— Ninguno —</option>
-        ${state.eventos.map(e=>`<option value="${e.id}">${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}
+        ${state.eventos.map(e=>`<option value="${e.id}" ${p&&p.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}
       </select>
     </div>
-    <div class="field"><label>Nombre del evento</label><input type="text" name="nombreEvento" placeholder="Ej: XV años de Valeska"></div>
-    <div class="field"><label>Cliente</label><input type="text" name="cliente" placeholder="Ej: Familia Giménez"></div>
+    <div class="field"><label>Nombre del evento</label><input type="text" name="nombreEvento" value="${p?(p.nombreEvento||''):''}" placeholder="Ej: XV años de Valeska"></div>
+    <div class="field"><label>Cliente</label><input type="text" name="cliente" value="${p?(p.cliente||''):''}" placeholder="Ej: Familia Giménez"></div>
     <div class="field-row">
-      <div class="field"><label>Fecha del evento</label><input type="date" name="fecha"></div>
-      <div class="field"><label>Horario</label><input type="text" name="horario" placeholder="Ej: a confirmar, 20:00hs…"></div>
+      <div class="field"><label>Fecha del evento</label><input type="date" name="fecha" value="${p?(p.fecha||''):''}"></div>
+      <div class="field"><label>Horario</label><input type="text" name="horario" value="${p?(p.horario||''):''}" placeholder="Ej: a confirmar, 20:00hs…"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Ciudad</label>
-        <select name="ciudad">${CIUDADES_PARAGUAY.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+        <select name="ciudad">${CIUDADES_PARAGUAY.map(c=>`<option value="${c}" ${p&&p.ciudad===c?'selected':''}>${c}</option>`).join('')}</select>
       </div>
-      <div class="field"><label>Lugar / salón</label><input type="text" name="lugar" placeholder="Nombre del salón o dirección"></div>
+      <div class="field"><label>Lugar / salón</label><input type="text" name="lugar" value="${p?(p.lugar||''):''}" placeholder="Nombre del salón o dirección"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Horas de servicio</label><input type="number" name="horas" value="${cfg.horasBaseIncluidas}"></div>
+      <div class="field"><label>Horas de servicio</label><input type="number" name="horas" value="${p?p.horas:cfg.horasBaseIncluidas}"></div>
       <div class="field"><label>Zona</label>
-        <select name="zonaIdx">${cfg.zonas.map((z,i)=>`<option value="${i}">${z.nombre}${z.ajuste?' (+'+fmtMoney(z.ajuste)+')':''}</option>`).join('')}</select>
+        <select name="zonaIdx">${cfg.zonas.map((z,i)=>`<option value="${i}" ${(p?zonaIdxActual:0)===i?'selected':''}>${z.nombre}${z.ajuste?' (+'+fmtMoney(z.ajuste)+')':''}</option>`).join('')}</select>
       </div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Precio hora adicional</label><input type="text" inputmode="decimal" class="input-monto" name="precioHoraAdicional" value="${cfg.precioHoraAdicional}"></div>
+      <div class="field"><label>Precio hora adicional</label><input type="text" inputmode="decimal" class="input-monto" name="precioHoraAdicional" value="${p?p.precioHoraAdicional:cfg.precioHoraAdicional}"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Precio trago adicional (c/alcohol)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoConAlcoholRef" value="${cfg.precioTragoConAlcohol}"></div>
-      <div class="field"><label>Precio trago adicional (s/alcohol)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoSinAlcoholRef" value="${cfg.precioTragoSinAlcohol}"></div>
+      <div class="field"><label>Precio trago adicional (c/alcohol)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoConAlcoholRef" value="${p?p.precioTragoConAlcohol:cfg.precioTragoConAlcohol}"></div>
+      <div class="field"><label>Precio trago adicional (s/alcohol)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoSinAlcoholRef" value="${p?p.precioTragoSinAlcohol:cfg.precioTragoSinAlcohol}"></div>
     </div>
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Barra libre</label>
@@ -2713,39 +2747,66 @@ function presupuestoFormFields(){
     </div>
 
     <div class="field-row">
-      <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes" value="0"></div>
-      <div class="field"><label>Precio por joven</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaJoven" value="${cfg.precioPersonaJoven}"></div>
+      <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes" value="${p?(p.jovenes||0):0}"></div>
+      <div class="field"><label>Precio por joven</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaJoven" value="${p?p.precioPersonaJoven:cfg.precioPersonaJoven}"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos" value="0"></div>
-      <div class="field"><label>Precio por adulto</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaAdulto" value="${cfg.precioPersonaAdulto}"></div>
+      <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos" value="${p?(p.adultos||0):0}"></div>
+      <div class="field"><label>Precio por adulto</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaAdulto" value="${p?p.precioPersonaAdulto:cfg.precioPersonaAdulto}"></div>
     </div>
     <div id="barraLibre2Wrap">
-      <button type="button" class="btn small ghost" id="btnMostrarBarraLibre2" style="margin-bottom:16px;">+ Agregar otra opción de barra libre</button>
+      ${p && p.barraLibre2 ? barraLibre2BlockHtml(p.barraLibre2) : `<button type="button" class="btn small ghost" id="btnMostrarBarraLibre2" style="margin-bottom:16px;">+ Agregar otra opción de barra libre</button>`}
     </div>
 
-    <div class="field"><label>Descuento sobre el total (%, opcional — para casos puntuales)</label><input type="number" name="descuentoPercent" min="0" max="100" value="" placeholder="Ej: 10"></div>
+    <div class="field"><label>Descuento sobre el total (%, opcional — para casos puntuales)</label><input type="number" name="descuentoPercent" min="0" max="100" value="${p&&p.descuentoPercent?p.descuentoPercent:''}" placeholder="Ej: 10"></div>
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Opciones de tragos con alcohol (1 a 3)</label>
     <div id="tragosConContainer">
-      ${tierBlockHtml('con', 0, cfg.precioTragoConAlcohol)}
+      ${(p && p.tragosConAlcohol && p.tragosConAlcohol.length>0) ? p.tragosConAlcohol.map((t,i)=>tierBlockHtml('con', i, cfg.precioTragoConAlcohol, t)).join('') : tierBlockHtml('con', 0, cfg.precioTragoConAlcohol)}
     </div>
     <button type="button" class="btn small ghost" id="btnAgregarCon" style="margin-bottom:16px;">+ Agregar otra opción de tragos</button>
 
     <div id="sinAlcoholWrap">
-      <button type="button" class="btn small ghost" id="btnMostrarSin">+ Agregar tragos sin alcohol</button>
+      ${(p && p.tragosSinAlcohol && p.tragosSinAlcohol.length>0) ? sinAlcoholBlockHtml(p.tragosSinAlcohol, cfg) : `<button type="button" class="btn small ghost" id="btnMostrarSin">+ Agregar tragos sin alcohol</button>`}
     </div>
   `;
 }
+function barraLibre2BlockHtml(b2){
+  const cfg = state.presupuestoConfig || seedPresupuestoConfig();
+  b2 = b2 || {};
+  return `
+    <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Barra libre — Opción 2 (ej: otra cantidad de horas)</label>
+    <div class="field"><label>Horas de servicio de esta opción</label><input type="number" name="horas2" value="${b2.horas||cfg.horasBaseIncluidas}"></div>
+    <div class="field-row">
+      <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes2" value="${b2.jovenes||0}"></div>
+      <div class="field"><label>Precio por joven</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaJoven2" value="${b2.precioPersonaJoven||cfg.precioPersonaJoven}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos2" value="${b2.adultos||0}"></div>
+      <div class="field"><label>Precio por adulto</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaAdulto2" value="${b2.precioPersonaAdulto||cfg.precioPersonaAdulto}"></div>
+    </div>
+    <button type="button" class="btn small danger" id="btnQuitarBarraLibre2" style="margin-bottom:16px;">Quitar Opción 2</button>
+  `;
+}
+function sinAlcoholBlockHtml(tiers, cfg){
+  tiers = (tiers && tiers.length>0) ? tiers : [{}];
+  return `
+    <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Opciones de tragos sin alcohol (1 a 3)</label>
+    <div id="tragosSinContainer">${tiers.map((t,i)=>tierBlockHtml('sin', i, cfg.precioTragoSinAlcohol, t)).join('')}</div>
+    <button type="button" class="btn small ghost" id="btnAgregarSin" style="margin-bottom:8px;">+ Agregar otra opción</button>
+    <button type="button" class="btn small danger" id="btnQuitarSin" style="margin-bottom:16px;">Quitar sección sin alcohol</button>
+  `;
+}
 
-function openPresupuestoModal(){
+function openPresupuestoModal(id){
   if(!state.presupuestoConfig) state.presupuestoConfig = seedPresupuestoConfig();
-  let conCounter = 1;
-  let sinCounter = 0;
+  const presupuestoExistente = id ? state.presupuestos.find(x=>x.id===id) : null;
+  let conCounter = presupuestoExistente && presupuestoExistente.tragosConAlcohol && presupuestoExistente.tragosConAlcohol.length>0 ? presupuestoExistente.tragosConAlcohol.length : 1;
+  let sinCounter = presupuestoExistente && presupuestoExistente.tragosSinAlcohol && presupuestoExistente.tragosSinAlcohol.length>0 ? presupuestoExistente.tragosSinAlcohol.length : 0;
   modalContent = {
-    title: 'Nuevo presupuesto',
-    bodyHtml: presupuestoFormFields(),
-    customSubmitLabel: 'Generar presupuesto',
+    title: presupuestoExistente ? 'Editar presupuesto' : 'Nuevo presupuesto',
+    bodyHtml: presupuestoFormFields(presupuestoExistente),
+    customSubmitLabel: presupuestoExistente ? 'Guardar cambios' : 'Generar presupuesto',
     afterRender: (modalEl)=>{
       const sel = modalEl.querySelector('#pEvento');
       sel.addEventListener('change', ()=>{
@@ -2779,14 +2840,10 @@ function openPresupuestoModal(){
       });
 
       const sinWrap = modalEl.querySelector('#sinAlcoholWrap');
-      function mostrarSinAlcohol(){
-        sinCounter = 1;
-        sinWrap.innerHTML = `
-          <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Opciones de tragos sin alcohol (1 a 3)</label>
-          <div id="tragosSinContainer">${tierBlockHtml('sin', 0, cfg.precioTragoSinAlcohol)}</div>
-          <button type="button" class="btn small ghost" id="btnAgregarSin" style="margin-bottom:8px;">+ Agregar otra opción</button>
-          <button type="button" class="btn small danger" id="btnQuitarSin" style="margin-bottom:16px;">Quitar sección sin alcohol</button>
-        `;
+      function bindSinAlcoholSection(tiers){
+        sinCounter = tiers && tiers.length>0 ? tiers.length : 1;
+        sinWrap.innerHTML = sinAlcoholBlockHtml(tiers, cfg);
+        formatearInputsMonto(sinWrap);
         const sinContainer = sinWrap.querySelector('#tragosSinContainer');
         bindRemoveTiers(sinContainer);
         sinWrap.querySelector('#btnAgregarSin').addEventListener('click', ()=>{
@@ -2799,33 +2856,25 @@ function openPresupuestoModal(){
         sinWrap.querySelector('#btnQuitarSin').addEventListener('click', ()=>{
           sinCounter = 0;
           sinWrap.innerHTML = `<button type="button" class="btn small ghost" id="btnMostrarSin">+ Agregar tragos sin alcohol</button>`;
-          sinWrap.querySelector('#btnMostrarSin').addEventListener('click', mostrarSinAlcohol);
+          sinWrap.querySelector('#btnMostrarSin').addEventListener('click', ()=>bindSinAlcoholSection(null));
         });
       }
-      modalEl.querySelector('#btnMostrarSin').addEventListener('click', mostrarSinAlcohol);
+      const btnMostrarSin = modalEl.querySelector('#btnMostrarSin');
+      if(btnMostrarSin) btnMostrarSin.addEventListener('click', ()=>bindSinAlcoholSection(null));
+      else bindSinAlcoholSection(presupuestoExistente && presupuestoExistente.tragosSinAlcohol && presupuestoExistente.tragosSinAlcohol.length>0 ? presupuestoExistente.tragosSinAlcohol : null);
 
       const barra2Wrap = modalEl.querySelector('#barraLibre2Wrap');
-      function mostrarBarraLibre2(){
-        barra2Wrap.innerHTML = `
-          <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Barra libre — Opción 2 (ej: otra cantidad de horas)</label>
-          <div class="field"><label>Horas de servicio de esta opción</label><input type="number" name="horas2" value="${cfg.horasBaseIncluidas}"></div>
-          <div class="field-row">
-            <div class="field"><label>Cantidad de jóvenes</label><input type="number" name="jovenes2" value="0"></div>
-            <div class="field"><label>Precio por joven</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaJoven2" value="${cfg.precioPersonaJoven}"></div>
-          </div>
-          <div class="field-row">
-            <div class="field"><label>Cantidad de adultos</label><input type="number" name="adultos2" value="0"></div>
-            <div class="field"><label>Precio por adulto</label><input type="text" inputmode="decimal" class="input-monto" name="precioPersonaAdulto2" value="${cfg.precioPersonaAdulto}"></div>
-          </div>
-          <button type="button" class="btn small danger" id="btnQuitarBarraLibre2" style="margin-bottom:16px;">Quitar Opción 2</button>
-        `;
+      function bindBarraLibre2Section(b2){
+        barra2Wrap.innerHTML = barraLibre2BlockHtml(b2);
         formatearInputsMonto(barra2Wrap);
         barra2Wrap.querySelector('#btnQuitarBarraLibre2').addEventListener('click', ()=>{
           barra2Wrap.innerHTML = `<button type="button" class="btn small ghost" id="btnMostrarBarraLibre2" style="margin-bottom:16px;">+ Agregar otra opción de barra libre</button>`;
-          barra2Wrap.querySelector('#btnMostrarBarraLibre2').addEventListener('click', mostrarBarraLibre2);
+          barra2Wrap.querySelector('#btnMostrarBarraLibre2').addEventListener('click', ()=>bindBarraLibre2Section(null));
         });
       }
-      modalEl.querySelector('#btnMostrarBarraLibre2').addEventListener('click', mostrarBarraLibre2);
+      const btnMostrarBarraLibre2 = modalEl.querySelector('#btnMostrarBarraLibre2');
+      if(btnMostrarBarraLibre2) btnMostrarBarraLibre2.addEventListener('click', ()=>bindBarraLibre2Section(null));
+      else bindBarraLibre2Section(presupuestoExistente && presupuestoExistente.barraLibre2 ? presupuestoExistente.barraLibre2 : null);
 
       const avisoPolitica = modalEl.querySelector('#politicaAviso');
       function mostrarAviso(texto){ avisoPolitica.textContent = texto; avisoPolitica.style.display = 'block'; }
@@ -2890,8 +2939,10 @@ function openPresupuestoModal(){
       const tragosSinAlcohol = leerTiers(form.querySelector('#tragosSinContainer'));
 
       const p = {
-        id: uid(), fechaCreacion: Date.now(), adminId: adminUnlocked.id,
-        eventoId: (document.getElementById('pEvento')||{}).value || null,
+        id: presupuestoExistente ? presupuestoExistente.id : uid(),
+        fechaCreacion: presupuestoExistente ? presupuestoExistente.fechaCreacion : Date.now(),
+        adminId: presupuestoExistente ? presupuestoExistente.adminId : adminUnlocked.id,
+        eventoId: (document.getElementById('pEvento')||{}).value || (presupuestoExistente ? presupuestoExistente.eventoId : null) || null,
         nombreEvento: form.nombreEvento.value.trim(),
         cliente: form.cliente.value.trim(), fecha: form.fecha.value, horario: form.horario.value.trim(),
         ciudad: form.ciudad.value, lugar: form.lugar.value.trim(),
@@ -2913,7 +2964,7 @@ function openPresupuestoModal(){
         } : null,
         incluye: [...cfg.incluye], observaciones: [...cfg.observaciones],
       };
-      if(!p.eventoId){
+      if(!p.eventoId && !presupuestoExistente){
         const lugarCompleto = [p.ciudad, p.lugar].filter(Boolean).join(' — ');
         const nuevoEvento = {
           id: uid(), estado: 'posible', fecha: p.fecha, lugar: lugarCompleto,
@@ -2931,10 +2982,17 @@ function openPresupuestoModal(){
         p.eventoId = nuevoEvento.id;
         pushLog(adminUnlocked.nombre, 'Evento posible creado desde presupuesto', `${lugarCompleto||'(sin lugar)'} — ${fmtDate(p.fecha)}`);
       }
-      state.presupuestos.push(p);
-      pushLog(adminUnlocked.nombre, 'Presupuesto generado', `${p.cliente||'(sin nombre)'} — ${fmtDate(p.fecha)}`);
-      saveState(); closeModal(); removeModal();
-      renderPresupuestoPrint(p);
+      if(presupuestoExistente){
+        Object.assign(presupuestoExistente, p);
+        pushLog(adminUnlocked.nombre, 'Presupuesto editado', `${p.cliente||p.nombreEvento||'(sin nombre)'} — ${fmtDate(p.fecha)}`);
+        saveState(); closeModal(); removeModal();
+        render();
+      } else {
+        state.presupuestos.push(p);
+        pushLog(adminUnlocked.nombre, 'Presupuesto generado', `${p.cliente||'(sin nombre)'} — ${fmtDate(p.fecha)}`);
+        saveState(); closeModal(); removeModal();
+        renderPresupuestoPrint(p);
+      }
     },
   };
   render();
@@ -4355,16 +4413,20 @@ function openInsumoModal(id){
 // ================= GASTOS E INVERSIONES =================
 function renderGastos(){
   const rows = [...state.gastos].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
-  const totalEmpresa = sumaWhere(state.gastos, g=>g.tipo==='empresa');
-  const totalEventos = sumaWhere(state.gastos, g=>g.tipo==='evento');
+  const totalEmpresa = sumaWhere(state.gastos, g=>g.tipo==='empresa' && g.movimiento!=='ingreso');
+  const totalEventos = sumaWhere(state.gastos, g=>g.tipo==='evento' && g.movimiento!=='ingreso');
+  const totalIngresosLibres = sumaWhere(state.gastos, g=>g.movimiento==='ingreso' && (!g.origenIngreso || g.origenIngreso==='libre'));
+  const totalIngresosInventario = sumaWhere(state.gastos, g=>g.movimiento==='ingreso' && (g.origenIngreso==='inventario' || g.origenIngreso==='premix'));
   return `
     <div class="row-between">
-      <div><h2 class="section-title">Gastos e Inversiones</h2><div class="section-hint">De la empresa en general o de un evento en particular. Cada uno puede ser un ingreso o un egreso de una caja.</div></div>
-      <button class="btn" id="btnNuevoGasto" ${state.cajas.length===0?'disabled title="Creá al menos una caja primero"':''}>+ Nuevo gasto/inversión</button>
+      <div><h2 class="section-title">Gastos e Ingresos</h2><div class="section-hint">Gastos e inversiones de la empresa o de un evento, e ingresos — libres o por venta de ítems del inventario (alcohol, herramientas, pre-mix por litros, etc.) — cada uno afecta la caja que elijas.</div></div>
+      <button class="btn" id="btnNuevoGasto" ${state.cajas.length===0?'disabled title="Creá al menos una caja primero"':''}>+ Nuevo gasto / ingreso</button>
     </div>
     <div class="grid-cards">
       <div class="stat"><div class="k">Total gastos empresa</div><div class="v red">${fmtMoney(totalEmpresa)}</div></div>
       <div class="stat"><div class="k">Total gastos por evento</div><div class="v red">${fmtMoney(totalEventos)}</div></div>
+      <div class="stat"><div class="k">Total ingresos libres</div><div class="v sage">${fmtMoney(totalIngresosLibres)}</div></div>
+      <div class="stat"><div class="k">Total ingresos por venta de inventario</div><div class="v sage">${fmtMoney(totalIngresosInventario)}</div></div>
     </div>
     ${state.cajas.length===0 ? '<div class="empty">Creá al menos una caja en la pestaña "Cajas" antes de cargar movimientos.</div>' : (rows.length===0 ? '<div class="empty">No hay gastos ni inversiones registrados.</div>' : `
     <div class="card" style="padding:0; overflow-x:auto;">
@@ -4393,12 +4455,14 @@ function renderGastos(){
 function gastoFormFields(g){
   g = g || {tipo:'empresa', movimiento:'egreso'};
   const cajaSugerida = g.cajaId || (state.cajas.find(c=>c.administradorId===(adminUnlocked&&adminUnlocked.id))||{}).id || '';
+  const origenIngreso = g.origenIngreso || 'libre';
+  const esEdicionConStock = !!g.id;
   return `
     <div class="field-row">
       <div class="field"><label>Movimiento</label>
-        <select name="movimiento">
+        <select name="movimiento" id="gastoMovimiento">
           <option value="egreso" ${g.movimiento==='egreso'?'selected':''}>Egreso (sale de la caja)</option>
-          <option value="ingreso" ${g.movimiento==='ingreso'?'selected':''}>Ingreso (entra a la caja) — ej: seña</option>
+          <option value="ingreso" ${g.movimiento==='ingreso'?'selected':''}>Ingreso (entra a la caja) — ej: seña, venta</option>
         </select>
       </div>
       <div class="field"><label>Caja</label>
@@ -4416,39 +4480,142 @@ function gastoFormFields(g){
         <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${g.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
       </div>
     </div>
+
+    <div id="gastoOrigenIngresoWrap" style="${g.movimiento==='ingreso'?'':'display:none;'}">
+      <div class="field"><label>Origen del ingreso</label>
+        <select name="origenIngreso" id="gastoOrigenIngreso" ${esEdicionConStock?'disabled':''}>
+          <option value="libre" ${origenIngreso==='libre'?'selected':''}>Ingreso libre (describí de dónde vino)</option>
+          <option value="inventario" ${origenIngreso==='inventario'?'selected':''}>Venta de un ítem del inventario (alcohol, herramientas, etc.)</option>
+          <option value="premix" ${origenIngreso==='premix'?'selected':''}>Venta de pre-mix (por litros)</option>
+        </select>
+      </div>
+      <div class="field-row" id="gastoVentaInventarioWrap" style="${origenIngreso==='inventario'?'':'display:none;'}">
+        <div class="field"><label>Ítem vendido</label>
+          <select name="insumoId" ${esEdicionConStock?'disabled':''}>${state.insumos.map(i=>`<option value="${i.id}" ${g.insumoId===i.id?'selected':''}>${i.nombre}${i.unidad?` (${i.unidad})`:''}</option>`).join('')}</select>
+        </div>
+        <div class="field"><label>Cantidad vendida</label><input type="number" step="0.1" name="cantidadVendida" id="gastoCantidadVendida" value="${g.cantidadVendida||''}" ${esEdicionConStock?'disabled':''}></div>
+        <div class="field"><label>Precio por unidad</label><input type="text" inputmode="decimal" class="input-monto" name="precioUnitarioVenta" id="gastoPrecioUnitario" value="${g.precioUnitarioVenta||''}" ${esEdicionConStock?'disabled':''}></div>
+      </div>
+      <div class="field-row" id="gastoVentaPremixWrap" style="${origenIngreso==='premix'?'':'display:none;'}">
+        <div class="field"><label>Litros vendidos</label><input type="number" step="0.1" name="cantidadVendidaPremix" id="gastoCantidadVendidaPremix" value="${origenIngreso==='premix'?(g.cantidadVendida||''):''}" ${esEdicionConStock?'disabled':''}></div>
+        <div class="field"><label>Precio por litro</label><input type="text" inputmode="decimal" class="input-monto" name="precioUnitarioVentaPremix" id="gastoPrecioUnitarioPremix" value="${origenIngreso==='premix'?(g.precioUnitarioVenta||''):''}" ${esEdicionConStock?'disabled':''}></div>
+      </div>
+      ${esEdicionConStock && (origenIngreso==='inventario'||origenIngreso==='premix')?'<div class="section-hint">El ítem y la cantidad vendida no se pueden editar una vez creado el ingreso (para no desajustar el stock). Si te equivocaste, eliminá este registro y cargalo de nuevo.</div>':''}
+    </div>
+
     <div class="field-row">
       <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${g.fecha||todayStr()}"></div>
-      <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${g.monto||''}"></div>
+      <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto" id="gastoMonto" value="${g.monto||''}"></div>
     </div>
-    <div class="field"><label>Categoría</label><input type="text" name="categoria" value="${g.categoria||''}" placeholder="Seña, inversión, sueldo, gasto diario, equipamiento…"></div>
-    <div class="field"><label>Descripción</label><textarea name="descripcion">${g.descripcion||''}</textarea></div>
+    <div class="field"><label>Categoría</label><input type="text" name="categoria" value="${g.categoria||''}" placeholder="Seña, inversión, sueldo, gasto diario, equipamiento, venta…"></div>
+    <div class="field"><label>Descripción${g.movimiento==='ingreso'?' (de dónde vino este ingreso)':''}</label><textarea name="descripcion">${g.descripcion||''}</textarea></div>
   `;
 }
 function openGastoModal(id){
   const g = id ? state.gastos.find(x=>x.id===id) : null;
   modalContent = {
-    title: g ? 'Editar gasto / inversión' : 'Nuevo gasto / inversión',
+    title: g ? (g.movimiento==='ingreso'?'Editar ingreso':'Editar gasto / inversión') : 'Nuevo gasto / ingreso',
     bodyHtml: gastoFormFields(g),
     afterRender: (modalEl)=>{
       const tipoSel = modalEl.querySelector('#gastoTipo');
       const wrap = modalEl.querySelector('#gastoEventoWrap');
       tipoSel.addEventListener('change', ()=>{ wrap.style.display = tipoSel.value==='evento' ? '' : 'none'; });
+
+      const movSel = modalEl.querySelector('#gastoMovimiento');
+      const origenWrap = modalEl.querySelector('#gastoOrigenIngresoWrap');
+      movSel.addEventListener('change', ()=>{ origenWrap.style.display = movSel.value==='ingreso' ? '' : 'none'; });
+
+      const origenSel = modalEl.querySelector('#gastoOrigenIngreso');
+      const ventaInventarioWrap = modalEl.querySelector('#gastoVentaInventarioWrap');
+      const ventaPremixWrap = modalEl.querySelector('#gastoVentaPremixWrap');
+      if(origenSel){
+        origenSel.addEventListener('change', ()=>{
+          ventaInventarioWrap.style.display = origenSel.value==='inventario' ? '' : 'none';
+          ventaPremixWrap.style.display = origenSel.value==='premix' ? '' : 'none';
+        });
+      }
+      const montoInput = modalEl.querySelector('#gastoMonto');
+      function autocalcular(cantidadSel, precioSel){
+        const cEl = modalEl.querySelector(cantidadSel), pEl = modalEl.querySelector(precioSel);
+        if(!cEl || !pEl) return;
+        const actualizar = ()=>{
+          const cant = Number(cEl.value)||0, precio = parseMonto(pEl.value)||0;
+          if(cant>0 && precio>0) montoInput.value = Math.round(cant*precio).toLocaleString('es-PY');
+        };
+        cEl.addEventListener('input', actualizar);
+        pEl.addEventListener('input', actualizar);
+      }
+      autocalcular('#gastoCantidadVendida', '#gastoPrecioUnitario');
+      autocalcular('#gastoCantidadVendidaPremix', '#gastoPrecioUnitarioPremix');
     },
     onSave: (form)=>{
+      const movimiento = form.movimiento.value;
+      const origenIngreso = movimiento==='ingreso' ? (g && g.id && g.origenIngreso ? g.origenIngreso : (form.origenIngreso?form.origenIngreso.value:'libre')) : null;
+
+      let insumoId = null, cantidadVendida = null, precioUnitarioVenta = null;
+      let descripcionAuto = '';
+      if(movimiento==='ingreso' && origenIngreso==='inventario' && !(g && g.id)){
+        insumoId = form.insumoId.value;
+        cantidadVendida = Number(form.cantidadVendida.value)||0;
+        precioUnitarioVenta = parseMonto(form.precioUnitarioVenta.value)||0;
+        if(!insumoId || cantidadVendida<=0){ alert('Elegí el ítem y la cantidad vendida.'); return; }
+        const ins = state.insumos.find(i=>i.id===insumoId);
+        if(cantidadVendida > stockInsumo(insumoId)){ if(!confirm(`El stock actual de "${ins?ins.nombre:''}" es ${stockInsumo(insumoId)} y estás vendiendo ${cantidadVendida}. ¿Continuar igual?`)) return; }
+        descripcionAuto = `Venta de ${cantidadVendida}${ins&&ins.unidad?' '+ins.unidad:''} de ${ins?ins.nombre:'ítem'}`;
+      } else if(movimiento==='ingreso' && origenIngreso==='premix' && !(g && g.id)){
+        cantidadVendida = Number(form.cantidadVendidaPremix.value)||0;
+        precioUnitarioVenta = parseMonto(form.precioUnitarioVentaPremix.value)||0;
+        if(cantidadVendida<=0){ alert('Cargá la cantidad de litros vendidos.'); return; }
+        let premixInsumo = state.insumos.find(i=>i.nombre.trim().toLowerCase()==='premix');
+        if(!premixInsumo){
+          premixInsumo = {id:uid(), nombre:'Premix', tipo:'consumible', unidad:'litros', stockInicial:0, stockMinimo:0};
+          state.insumos.push(premixInsumo);
+          pushLog(adminUnlocked.nombre, 'Insumo agregado', 'Premix (creado automáticamente desde Ingresos)');
+        }
+        insumoId = premixInsumo.id;
+        if(cantidadVendida > stockInsumo(insumoId)){ if(!confirm(`El stock actual de Premix es ${stockInsumo(insumoId)} litros y estás vendiendo ${cantidadVendida}. ¿Continuar igual?`)) return; }
+        descripcionAuto = `Venta de ${cantidadVendida} litros de pre-mix`;
+      } else if(g && g.id && (g.origenIngreso==='inventario' || g.origenIngreso==='premix')){
+        insumoId = g.insumoId; cantidadVendida = g.cantidadVendida; precioUnitarioVenta = g.precioUnitarioVenta;
+      }
+
+      const montoManual = parseMonto(form.monto.value);
       const data = {
         tipo: form.tipo.value,
         eventoId: form.tipo.value==='evento' ? form.eventoId.value : null,
-        movimiento: form.movimiento.value, cajaId: form.cajaId.value,
-        fecha: form.fecha.value, monto: parseMonto(form.monto.value),
-        categoria: form.categoria.value.trim(), descripcion: form.descripcion.value.trim(),
+        movimiento, cajaId: form.cajaId.value,
+        fecha: form.fecha.value, monto: montoManual || (cantidadVendida&&precioUnitarioVenta ? Math.round(cantidadVendida*precioUnitarioVenta) : 0),
+        categoria: form.categoria.value.trim() || (origenIngreso==='premix' ? 'Venta de pre-mix' : (origenIngreso==='inventario' ? 'Venta de inventario' : '')),
+        descripcion: form.descripcion.value.trim() || descripcionAuto,
         adminId: g ? g.adminId : adminUnlocked.id,
+        origenIngreso: origenIngreso,
+        insumoId: insumoId, cantidadVendida: cantidadVendida, precioUnitarioVenta: precioUnitarioVenta,
       };
       const cajaNombre = (state.cajas.find(c=>c.id===data.cajaId)||{}).nombre || '';
-      if(g){ Object.assign(g, data); pushLog(adminUnlocked.nombre, 'Gasto/inversión editado', `${data.movimiento==='ingreso'?'+':'-'}${fmtMoney(data.monto)} — ${cajaNombre}`); } else { state.gastos.push(Object.assign({id:uid()}, data)); pushLog(adminUnlocked.nombre, 'Gasto/inversión registrado', `${data.movimiento==='ingreso'?'+':'-'}${fmtMoney(data.monto)} — ${cajaNombre}`); }
+      let gastoGuardado;
+      if(g){
+        Object.assign(g, data);
+        gastoGuardado = g;
+        pushLog(adminUnlocked.nombre, 'Gasto/ingreso editado', `${data.movimiento==='ingreso'?'+':'-'}${fmtMoney(data.monto)} — ${cajaNombre}`);
+      } else {
+        gastoGuardado = Object.assign({id:uid()}, data);
+        state.gastos.push(gastoGuardado);
+        pushLog(adminUnlocked.nombre, data.movimiento==='ingreso'?'Ingreso registrado':'Gasto/inversión registrado', `${data.movimiento==='ingreso'?'+':'-'}${fmtMoney(data.monto)} — ${cajaNombre}`);
+      }
+      if(!g && insumoId && cantidadVendida>0){
+        state.movimientosInsumo.push({id:uid(), insumoId, tipo:'salida', cantidad:cantidadVendida, fecha: data.fecha, gastoId: gastoGuardado.id, descripcion: descripcionAuto || 'Venta registrada en Ingresos'});
+      }
       saveState(); closeModal(); render();
     },
     onDelete: g ? ()=>{
-      if(confirm('¿Eliminar este registro?')){ state.gastos = state.gastos.filter(x=>x.id!==g.id); pushLog(adminUnlocked.nombre, 'Gasto/inversión eliminado', fmtMoney(g.monto)); saveState(); closeModal(); render(); }
+      if(confirm('¿Eliminar este registro?')){
+        if(g.origenIngreso==='inventario' || g.origenIngreso==='premix'){
+          state.movimientosInsumo = state.movimientosInsumo.filter(m=>m.gastoId!==g.id);
+        }
+        state.gastos = state.gastos.filter(x=>x.id!==g.id);
+        pushLog(adminUnlocked.nombre, 'Gasto/ingreso eliminado', fmtMoney(g.monto));
+        saveState(); closeModal(); render();
+      }
     } : null,
   };
   render();
@@ -5530,6 +5697,13 @@ function bindPanelEvents(){
   panel.querySelectorAll('[data-ver-presupuesto]').forEach(b=>b.addEventListener('click', ()=>{
     const p = state.presupuestos.find(x=>x.id===b.dataset.verPresupuesto);
     if(p) renderPresupuestoPrint(p);
+  }));
+  panel.querySelectorAll('[data-editar-presupuesto]').forEach(b=>b.addEventListener('click', ()=>openPresupuestoModal(b.dataset.editarPresupuesto)));
+  panel.querySelectorAll('[data-eliminar-presupuesto]').forEach(b=>b.addEventListener('click', ()=>{
+    if(!confirm('¿Eliminar este presupuesto? Esta acción no se puede deshacer.')) return;
+    state.presupuestos = state.presupuestos.filter(x=>x.id!==b.dataset.eliminarPresupuesto);
+    pushLog(adminUnlocked.nombre, 'Presupuesto eliminado', '');
+    saveState(); renderPanel();
   }));
   const presupuestoConfigForm = document.getElementById('presupuestoConfigForm');
   const btnGuardarPresupuestoConfig = document.getElementById('btnGuardarPresupuestoConfig');
