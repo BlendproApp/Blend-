@@ -696,7 +696,7 @@ function todosLosRoles(){ return ROLES.concat(state.rolesExtra||[]); }
 const TIPOS_TRABAJO = ['Logística','Limpieza','Producción'];
 const ACCIONES_LOG_LIMITE = 500;
 
-let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [], prestamos: [] };
+let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [], prestamos: [], prestamosAdmin: [] };
 let colaboradorLimitadoUnlocked = null;
 let currentTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
 function toggleTheme(){
@@ -932,6 +932,7 @@ async function loadState(intentoNro){
       state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
       state.kits = parsed.kits || [];
       state.prestamos = parsed.prestamos || [];
+      state.prestamosAdmin = parsed.prestamosAdmin || [];
       migrarProduccionAntigua();
       migrarRecetarioNuevosTragos();
       state.insumos.forEach(ins=>{ if(!ins.tipo) ins.tipo = 'herramienta'; });
@@ -1003,6 +1004,7 @@ async function saveState(intentoNro){
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
       cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
+      prestamosAdmin: state.prestamosAdmin,
     };
     // red de seguridad: Firestore rechaza el documento ENTERO si algún campo, en cualquier parte, quedó en "undefined"
     // (fue justo lo que pasó con un campo nuevo de préstamos). Este viaje por JSON limpia cualquier "undefined" a null/omitido
@@ -1274,8 +1276,14 @@ function saldoCaja(cajaId){
   const ingresosCobros = sumaWhere(state.cobros, c=>c.cajaId===cajaId);
   const egresosCompras = sumaWhere(state.compras, c=>c.cajaId===cajaId);
   const egresosPagos = sumaWhere(state.pagos, p=>p.cajaId===cajaId);
-  return inicial + ingresosGastos + ingresosCobros - egresosGastos - egresosCompras - egresosPagos;
+  // Préstamos a administradores: un préstamo "histórico" (ya existía antes de cargarlo acá) no resta de ninguna caja real.
+  // Uno nuevo sí resta al otorgarse, y cada abono que se registre después sí suma a la caja donde se devuelve.
+  const egresosPrestamosAdmin = sumaWhere((state.prestamosAdmin||[]), pr=>pr.cajaId===cajaId && !pr.esHistorico);
+  const ingresosPagosPrestamosAdmin = (state.prestamosAdmin||[]).reduce((s,pr)=> s + sumaWhere(pr.pagos||[], pg=>pg.cajaId===cajaId), 0);
+  return inicial + ingresosGastos + ingresosCobros + ingresosPagosPrestamosAdmin - egresosGastos - egresosCompras - egresosPagos - egresosPrestamosAdmin;
 }
+function montoPagadoPrestamoAdmin(pr){ return (pr.pagos||[]).reduce((s,pg)=>s+(Number(pg.monto)||0),0); }
+function saldoPendientePrestamoAdmin(pr){ return Math.max(0, (Number(pr.monto)||0) - montoPagadoPrestamoAdmin(pr)); }
 function cajasDisponibles(){
   // cada administrador solo puede cargar/mover su propia caja (o una sin dueño asignado)
   return state.cajas.filter(c=>!c.administradorId || c.administradorId===(adminUnlocked&&adminUnlocked.id));
@@ -1388,6 +1396,7 @@ function render(){
       ['gastos','Gastos e Ingresos'],
       ['cobros','Cobros'],
       ['cajas','Cajas'],
+      ['prestamosAdmin','Préstamos a Administradores'],
     ]},
     { id: 'catalogo', label: 'Catálogo', icon: '◇', tabs: [
       ['recetario','Recetario'],
@@ -1503,12 +1512,13 @@ function renderPanel(){
     prestamos: renderPrestamos,
     gastos: renderGastos,
     cajas: renderCajas,
+    prestamosAdmin: renderPrestamosAdmin,
     pagos: renderPagos,
     reportes: renderReportes,
     actividad: renderActividad,
     administradores: renderAdministradores,
   };
-  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','cajas','pagos','reportes','actividad','administradores']);
+  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','cajas','prestamosAdmin','pagos','reportes','actividad','administradores']);
   if(adminOnly.has(currentTab) && !adminUnlocked){
     panel.innerHTML = `<div class="empty">Necesitás ingresar como administrador para ver esta sección.</div>`;
     return;
@@ -3013,14 +3023,19 @@ function openPresupuestoModal(id){
 
 function renderPresupuestoPrint(p){
   const factorDescuento = 1 - (Number(p.descuentoPercent)||0)/100;
-  const horasAdicionales = Math.max(0, p.horas - p.horasBaseIncluidas);
-  const totalHorasAdicionales = horasAdicionales * p.precioHoraAdicional;
+  // Las horas contratadas de entrada ya están incluidas en el precio por persona
+  // (calculado según la política: sin recargo + descuento creciente). No se suma
+  // una línea aparte de "horas adicionales" para evitar cobrar dos veces las mismas horas.
   const totalJovenes = (p.jovenes||0) * p.precioPersonaJoven;
   const totalAdultos = (p.adultos||0) * p.precioPersonaAdulto;
   const totalPersonas = (p.jovenes||0) + (p.adultos||0);
-  const totalBarraLibre = (totalJovenes + totalAdultos + totalHorasAdicionales + (p.zonaAjuste||0)) * factorDescuento;
+  const subtotalBarraLibre = totalJovenes + totalAdultos + (p.zonaAjuste||0);
+  const montoDescuentoBarraLibre = subtotalBarraLibre * (Number(p.descuentoPercent)||0)/100;
+  const totalBarraLibre = subtotalBarraLibre - montoDescuentoBarraLibre;
   const b2 = p.barraLibre2;
-  const totalBarraLibre2 = b2 ? ((b2.jovenes||0)*b2.precioPersonaJoven + (b2.adultos||0)*b2.precioPersonaAdulto) * factorDescuento : 0;
+  const subtotalBarraLibre2 = b2 ? ((b2.jovenes||0)*b2.precioPersonaJoven + (b2.adultos||0)*b2.precioPersonaAdulto) : 0;
+  const montoDescuentoBarraLibre2 = subtotalBarraLibre2 * (Number(p.descuentoPercent)||0)/100;
+  const totalBarraLibre2 = subtotalBarraLibre2 - montoDescuentoBarraLibre2;
   const totalPersonas2 = b2 ? (b2.jovenes||0)+(b2.adultos||0) : 0;
   const tragosConAlcohol = p.tragosConAlcohol || [];
   const tragosSinAlcohol = p.tragosSinAlcohol || [];
@@ -3063,22 +3078,33 @@ function renderPresupuestoPrint(p){
           <div style="font-size:0.9rem; padding-left:4px;">
             ${p.jovenes>0?`<div>Barra libre ${p.jovenes} jóvenes: ${fmtMoney(totalJovenes)}</div>`:''}
             ${p.adultos>0?`<div>Barra libre ${p.adultos} adultos: ${fmtMoney(totalAdultos)}</div>`:''}
-            ${horasAdicionales>0?`<div>${horasAdicionales} hora(s) adicional(es): ${fmtMoney(totalHorasAdicionales)}</div>`:''}
             ${p.zonaAjuste?`<div>Ajuste de zona: ${fmtMoney(p.zonaAjuste)}</div>`:''}
           </div>
-          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee; font-weight:700;">Total barra libre: ${fmtMoney(totalBarraLibre)}</div>
-          ${p.descuentoPercent>0 ? `<div style="font-size:0.78rem; color:#888;">(incluye descuento del ${p.descuentoPercent}%)</div>` : ''}
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee;">
+            ${p.descuentoPercent>0 ? `
+            <div style="font-size:0.9rem; color:${VERDE};">Descuento (${p.descuentoPercent}%): -${fmtMoney(montoDescuentoBarraLibre)}</div>
+            <div style="font-weight:700; margin-top:4px;">Total a pagar: ${fmtMoney(totalBarraLibre)}</div>
+            ` : `
+            <div style="font-weight:700;">Total barra libre: ${fmtMoney(totalBarraLibre)}</div>
+            `}
+          </div>
         </div>` : ''}
 
         ${b2 && (b2.jovenes>0 || b2.adultos>0) ? `
         <div style="margin-bottom:16px;">
           <div style="font-weight:700; color:${VERDE}; margin-bottom:8px;">Servicio Barra Libre — Opción 2 — ${totalPersonas2} personas, ${b2.horas} horas.</div>
           <div style="font-size:0.9rem; padding-left:4px;">
-            ${b2.jovenes>0?`<div>Barra libre ${b2.jovenes} jóvenes: ${fmtMoney(b2.jovenes*b2.precioPersonaJoven*factorDescuento)}</div>`:''}
-            ${b2.adultos>0?`<div>Barra libre ${b2.adultos} adultos: ${fmtMoney(b2.adultos*b2.precioPersonaAdulto*factorDescuento)}</div>`:''}
+            ${b2.jovenes>0?`<div>Barra libre ${b2.jovenes} jóvenes: ${fmtMoney(b2.jovenes*b2.precioPersonaJoven)}</div>`:''}
+            ${b2.adultos>0?`<div>Barra libre ${b2.adultos} adultos: ${fmtMoney(b2.adultos*b2.precioPersonaAdulto)}</div>`:''}
           </div>
-          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee; font-weight:700;">Total barra libre — Opción 2: ${fmtMoney(totalBarraLibre2)}</div>
-          ${p.descuentoPercent>0 ? `<div style="font-size:0.78rem; color:#888;">(incluye descuento del ${p.descuentoPercent}%)</div>` : ''}
+          <div style="margin-top:8px; padding-top:8px; border-top:1px solid #eee;">
+            ${p.descuentoPercent>0 ? `
+            <div style="font-size:0.9rem; color:${VERDE};">Descuento (${p.descuentoPercent}%): -${fmtMoney(montoDescuentoBarraLibre2)}</div>
+            <div style="font-weight:700; margin-top:4px;">Total a pagar — Opción 2: ${fmtMoney(totalBarraLibre2)}</div>
+            ` : `
+            <div style="font-weight:700;">Total barra libre — Opción 2: ${fmtMoney(totalBarraLibre2)}</div>
+            `}
+          </div>
         </div>` : ''}
 
         ${tragosConAlcohol.length>0 ? `
@@ -3230,35 +3256,47 @@ function renderPresupuestoPrint(p){
     espacio(8);
 
     const factorDescuento = 1 - (Number(p.descuentoPercent)||0)/100;
-    const horasAdicionales = Math.max(0, p.horas - p.horasBaseIncluidas);
-    const totalHorasAdicionales = horasAdicionales * p.precioHoraAdicional;
+    // Las horas contratadas de entrada ya están incluidas en el precio por persona
+    // (calculado según la política: sin recargo + descuento creciente). No se suma
+    // una línea aparte de "horas adicionales" para evitar cobrar dos veces las mismas horas.
     const totalJovenes = (p.jovenes||0) * p.precioPersonaJoven;
     const totalAdultos = (p.adultos||0) * p.precioPersonaAdulto;
     const totalPersonas = (p.jovenes||0) + (p.adultos||0);
-    const totalBarraLibre = (totalJovenes + totalAdultos + totalHorasAdicionales + (p.zonaAjuste||0)) * factorDescuento;
+    const subtotalBarraLibre = totalJovenes + totalAdultos + (p.zonaAjuste||0);
+    const montoDescuentoBarraLibre = subtotalBarraLibre * (Number(p.descuentoPercent)||0)/100;
+    const totalBarraLibre = subtotalBarraLibre - montoDescuentoBarraLibre;
     const b2 = p.barraLibre2;
     const totalPersonas2 = b2 ? (b2.jovenes||0)+(b2.adultos||0) : 0;
-    const totalBarraLibre2 = b2 ? ((b2.jovenes||0)*b2.precioPersonaJoven + (b2.adultos||0)*b2.precioPersonaAdulto) * factorDescuento : 0;
+    const subtotalBarraLibre2 = b2 ? ((b2.jovenes||0)*b2.precioPersonaJoven + (b2.adultos||0)*b2.precioPersonaAdulto) : 0;
+    const montoDescuentoBarraLibre2 = subtotalBarraLibre2 * (Number(p.descuentoPercent)||0)/100;
+    const totalBarraLibre2 = subtotalBarraLibre2 - montoDescuentoBarraLibre2;
 
     if(p.jovenes>0 || p.adultos>0){
       linea(`Servicio Barra Libre ${totalPersonas} personas ${p.horas} horas.`, {bold:true, size:11.5});
       espacio(4);
-      if(p.jovenes>0) linea(`Barra libre ${p.jovenes} jóvenes : ${fmtMoney(totalJovenes*factorDescuento)}`, {indent:14});
-      if(p.adultos>0) linea(`Barra libre ${p.adultos} adultos : ${fmtMoney(totalAdultos*factorDescuento)}`, {indent:14});
-      if(horasAdicionales>0) linea(`${horasAdicionales} hora(s) adicional(es) : ${fmtMoney(totalHorasAdicionales*factorDescuento)}`, {indent:14});
-      if(p.zonaAjuste) linea(`Ajuste de zona : ${fmtMoney(p.zonaAjuste*factorDescuento)}`, {indent:14});
-      linea(`Total barra libre : ${fmtMoney(totalBarraLibre)}`, {indent:14, bold:true});
-      if(p.descuentoPercent>0) linea(`(incluye descuento del ${p.descuentoPercent}%)`, {indent:14, size:9, color:[130,130,130]});
+      if(p.jovenes>0) linea(`Barra libre ${p.jovenes} jóvenes : ${fmtMoney(totalJovenes)}`, {indent:14});
+      if(p.adultos>0) linea(`Barra libre ${p.adultos} adultos : ${fmtMoney(totalAdultos)}`, {indent:14});
+      if(p.zonaAjuste) linea(`Ajuste de zona : ${fmtMoney(p.zonaAjuste)}`, {indent:14});
+      if(p.descuentoPercent>0){
+        linea(`Descuento (${p.descuentoPercent}%) : -${fmtMoney(montoDescuentoBarraLibre)}`, {indent:14, color:VERDE_RGB});
+        linea(`Total a pagar : ${fmtMoney(totalBarraLibre)}`, {indent:14, bold:true});
+      } else {
+        linea(`Total barra libre : ${fmtMoney(totalBarraLibre)}`, {indent:14, bold:true});
+      }
       espacio(16);
     }
 
     if(b2 && (b2.jovenes>0 || b2.adultos>0)){
       linea(`Servicio Barra Libre — Opción 2 — ${totalPersonas2} personas ${b2.horas} horas.`, {bold:true, size:11.5});
       espacio(4);
-      if(b2.jovenes>0) linea(`Barra libre ${b2.jovenes} jóvenes : ${fmtMoney(b2.jovenes*b2.precioPersonaJoven*factorDescuento)}`, {indent:14});
-      if(b2.adultos>0) linea(`Barra libre ${b2.adultos} adultos : ${fmtMoney(b2.adultos*b2.precioPersonaAdulto*factorDescuento)}`, {indent:14});
-      linea(`Total barra libre — Opción 2 : ${fmtMoney(totalBarraLibre2)}`, {indent:14, bold:true});
-      if(p.descuentoPercent>0) linea(`(incluye descuento del ${p.descuentoPercent}%)`, {indent:14, size:9, color:[130,130,130]});
+      if(b2.jovenes>0) linea(`Barra libre ${b2.jovenes} jóvenes : ${fmtMoney(b2.jovenes*b2.precioPersonaJoven)}`, {indent:14});
+      if(b2.adultos>0) linea(`Barra libre ${b2.adultos} adultos : ${fmtMoney(b2.adultos*b2.precioPersonaAdulto)}`, {indent:14});
+      if(p.descuentoPercent>0){
+        linea(`Descuento (${p.descuentoPercent}%) : -${fmtMoney(montoDescuentoBarraLibre2)}`, {indent:14, color:VERDE_RGB});
+        linea(`Total a pagar — Opción 2 : ${fmtMoney(totalBarraLibre2)}`, {indent:14, bold:true});
+      } else {
+        linea(`Total barra libre — Opción 2 : ${fmtMoney(totalBarraLibre2)}`, {indent:14, bold:true});
+      }
       espacio(16);
     }
 
@@ -4724,6 +4762,161 @@ function openGastoModal(id){
   render();
 }
 
+// ================= PRÉSTAMOS A ADMINISTRADORES =================
+function renderPrestamosAdmin(){
+  const lista = state.prestamosAdmin||[];
+  const rows = [...lista].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const totalPrestado = sumaWhere(lista, ()=>true);
+  const totalDevuelto = lista.reduce((s,pr)=>s+montoPagadoPrestamoAdmin(pr),0);
+  const totalPendiente = lista.reduce((s,pr)=>s+saldoPendientePrestamoAdmin(pr),0);
+  return `
+    <div class="row-between">
+      <div><h2 class="section-title">Préstamos a Administradores</h2><div class="section-hint">Plata que un administrador saca como préstamo personal. Uno nuevo resta de la caja que elijas; uno marcado como "ya existente" no toca ninguna caja al cargarlo — pero cada abono que se devuelva después sí suma a la caja elegida.</div></div>
+      <button class="btn" id="btnNuevoPrestamoAdmin" ${state.admins.length===0?'disabled title="Cargá al menos un administrador primero"':''}>+ Nuevo préstamo</button>
+    </div>
+    <div class="grid-cards">
+      <div class="stat"><div class="k">Total prestado</div><div class="v">${fmtMoney(totalPrestado)}</div></div>
+      <div class="stat"><div class="k">Total devuelto</div><div class="v sage">${fmtMoney(totalDevuelto)}</div></div>
+      <div class="stat"><div class="k">Total pendiente</div><div class="v ${totalPendiente>0?'red':'sage'}">${fmtMoney(totalPendiente)}</div></div>
+    </div>
+    ${rows.length===0 ? '<div class="empty">No hay préstamos registrados.</div>' : `
+    <div class="card" style="padding:0; overflow-x:auto;">
+    <table>
+      <thead><tr><th>Fecha</th><th>Administrador</th><th>Monto</th><th>Motivo</th><th>Origen</th><th>Devuelto</th><th>Pendiente</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      ${rows.map(pr=>{
+        const admin = state.admins.find(a=>a.id===pr.adminId);
+        const caja = pr.cajaId ? state.cajas.find(c=>c.id===pr.cajaId) : null;
+        const pagado = montoPagadoPrestamoAdmin(pr);
+        const pendiente = saldoPendientePrestamoAdmin(pr);
+        const pagadoCompleto = pendiente<=0;
+        return `
+        <tr>
+          <td>${fmtDate(pr.fecha)}</td>
+          <td>${admin?admin.nombre:'—'}</td>
+          <td class="mono">${fmtMoney(pr.monto)}</td>
+          <td>${pr.motivo||'—'}</td>
+          <td>${pr.esHistorico ? '<span class="badge posible">Ya existía — no afectó caja</span>' : (caja?caja.nombre:'—')}</td>
+          <td class="mono" style="color:var(--sage);">${fmtMoney(pagado)}</td>
+          <td class="mono" style="color:${pendiente>0?'var(--red)':'var(--sage)'}">${fmtMoney(pendiente)}</td>
+          <td><span class="badge ${pagadoCompleto?'pagado':'senado'}">${pagadoCompleto?'Pagado':'Pendiente'}</span></td>
+          <td style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn small ghost" data-editar-prestamo-admin="${pr.id}">Editar</button>
+            ${!pagadoCompleto ? `<button class="btn small" data-abonar-prestamo-admin="${pr.id}">Registrar abono</button>` : ''}
+          </td>
+        </tr>
+      `;}).join('')}
+      </tbody>
+    </table>
+    </div>`}
+  `;
+}
+function prestamoAdminFormFields(pr){
+  pr = pr || {};
+  const esHistorico = !!pr.esHistorico;
+  return `
+    <div class="field"><label>Administrador</label>
+      <select name="adminId">${state.admins.map(a=>`<option value="${a.id}" ${pr.adminId===a.id?'selected':''}>${a.nombre}</option>`).join('')}</select>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${pr.fecha||todayStr()}"></div>
+      <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${pr.monto||''}" ${pr.id?'disabled':''}></div>
+    </div>
+    <div class="field"><label>Motivo (opcional)</label><input type="text" name="motivo" value="${pr.motivo||''}" placeholder="Ej: adelanto personal, imprevisto…"></div>
+    <div class="field" style="display:flex; align-items:center; gap:8px; flex-direction:row;">
+      <input type="checkbox" id="prestamoEsHistorico" name="esHistorico" ${esHistorico?'checked':''} ${pr.id?'disabled':''} style="width:auto; flex:none;">
+      <label for="prestamoEsHistorico" style="margin:0;">Es un préstamo que ya existía antes de cargar esto acá (no resta de ninguna caja)</label>
+    </div>
+    <div class="field" id="prestamoCajaWrap" style="${esHistorico?'display:none;':''}">
+      <label>Caja de la que sale el préstamo</label>
+      <select name="cajaId" ${pr.id?'disabled':''}>${cajasDisponibles().map(c=>`<option value="${c.id}" ${pr.cajaId===c.id?'selected':''}>${c.nombre}</option>`).join('')}</select>
+    </div>
+    ${pr.id?'<div class="section-hint">El monto, el origen y si es histórico no se pueden editar una vez creado (para no desajustar la caja ni lo ya devuelto). Si te equivocaste, eliminá el préstamo y cargalo de nuevo.</div>':''}
+  `;
+}
+function openPrestamoAdminModal(id){
+  const pr = id ? (state.prestamosAdmin||[]).find(x=>x.id===id) : null;
+  if(!pr && state.admins.length===0){ alert('Primero cargá al menos un administrador en la sección Administradores.'); return; }
+  modalContent = {
+    title: pr ? 'Editar préstamo' : 'Nuevo préstamo a administrador',
+    bodyHtml: prestamoAdminFormFields(pr),
+    afterRender: (modalEl)=>{
+      const chk = modalEl.querySelector('#prestamoEsHistorico');
+      const cajaWrap = modalEl.querySelector('#prestamoCajaWrap');
+      if(chk && !chk.disabled){
+        chk.addEventListener('change', ()=>{ cajaWrap.style.display = chk.checked ? 'none' : ''; });
+      }
+    },
+    onSave: (form)=>{
+      if(!pr){
+        const adminId = form.adminId.value;
+        const monto = parseMonto(form.monto.value);
+        const esHistorico = form.esHistorico.checked;
+        const cajaId = esHistorico ? null : form.cajaId.value;
+        if(!adminId){ alert('Elegí un administrador.'); return; }
+        if(monto<=0){ alert('Cargá un monto válido.'); return; }
+        if(!esHistorico && !cajaId){ alert('Elegí de qué caja sale el préstamo (o marcá que ya existía).'); return; }
+        const nuevo = {
+          id: uid(), adminId, monto, fecha: form.fecha.value || todayStr(),
+          motivo: form.motivo.value.trim(), esHistorico, cajaId, pagos: [],
+          creadoPorAdminId: adminUnlocked.id,
+        };
+        state.prestamosAdmin.push(nuevo);
+        const adminNombre = (state.admins.find(a=>a.id===adminId)||{}).nombre || '';
+        const origenTexto = esHistorico ? 'ya existía, no afectó caja' : ((state.cajas.find(c=>c.id===cajaId)||{}).nombre||'');
+        pushLog(adminUnlocked.nombre, 'Préstamo a administrador registrado', `${adminNombre} — ${fmtMoney(monto)} — ${origenTexto}`);
+      } else {
+        pr.adminId = form.adminId.value;
+        pr.fecha = form.fecha.value || pr.fecha;
+        pr.motivo = form.motivo.value.trim();
+        pushLog(adminUnlocked.nombre, 'Préstamo a administrador editado', fmtMoney(pr.monto));
+      }
+      saveState(); closeModal(); render();
+    },
+    onDelete: pr ? ()=>{
+      if(confirm('¿Eliminar este préstamo? También se eliminan los abonos registrados sobre él (y esos montos dejan de sumar a sus cajas).')){
+        state.prestamosAdmin = state.prestamosAdmin.filter(x=>x.id!==pr.id);
+        pushLog(adminUnlocked.nombre, 'Préstamo a administrador eliminado', fmtMoney(pr.monto));
+        saveState(); closeModal(); render();
+      }
+    } : null,
+  };
+  render();
+}
+function openAbonoPrestamoAdminModal(prestamoId){
+  const pr = (state.prestamosAdmin||[]).find(x=>x.id===prestamoId);
+  if(!pr) return;
+  if(state.cajas.length===0){ alert('Creá al menos una caja antes de registrar un abono.'); return; }
+  const pendiente = saldoPendientePrestamoAdmin(pr);
+  const admin = state.admins.find(a=>a.id===pr.adminId);
+  modalContent = {
+    title: `Registrar abono — ${admin?admin.nombre:''}`,
+    bodyHtml: `
+      <div class="section-hint" style="margin-top:0;">Saldo pendiente actual: ${fmtMoney(pendiente)}</div>
+      <div class="field-row">
+        <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${todayStr()}"></div>
+        <div class="field"><label>Monto del abono</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${pendiente}"></div>
+      </div>
+      <div class="field"><label>Caja donde se devuelve</label>
+        <select name="cajaId">${cajasDisponibles().map(c=>`<option value="${c.id}">${c.nombre}</option>`).join('')}</select>
+      </div>
+    `,
+    customSubmitLabel: 'Registrar abono',
+    onSave: (form)=>{
+      const monto = parseMonto(form.monto.value);
+      const cajaId = form.cajaId.value;
+      if(monto<=0){ alert('Cargá un monto válido.'); return; }
+      if(!cajaId){ alert('Elegí a qué caja entra el abono.'); return; }
+      if(monto > pendiente + 0.01 && !confirm(`El saldo pendiente es ${fmtMoney(pendiente)} y estás registrando ${fmtMoney(monto)}. ¿Continuar igual?`)) return;
+      if(!pr.pagos) pr.pagos = [];
+      pr.pagos.push({id:uid(), monto, fecha: form.fecha.value || todayStr(), cajaId, adminId: adminUnlocked.id});
+      pushLog(adminUnlocked.nombre, 'Abono de préstamo registrado', `${admin?admin.nombre:''} — ${fmtMoney(monto)}`);
+      saveState(); closeModal(); render();
+    },
+  };
+  render();
+}
+
 // ================= CAJAS =================
 function renderCajas(){
   const rows = state.cajas;
@@ -5939,6 +6132,11 @@ function bindPanelEvents(){
   if(btnNuevoGasto) btnNuevoGasto.addEventListener('click', ()=>openGastoModal(null));
   panel.querySelectorAll('[data-open-gasto]').forEach(b=>b.addEventListener('click', ()=>openGastoModal(b.dataset.openGasto)));
 
+  const btnNuevoPrestamoAdmin = document.getElementById('btnNuevoPrestamoAdmin');
+  if(btnNuevoPrestamoAdmin) btnNuevoPrestamoAdmin.addEventListener('click', ()=>openPrestamoAdminModal(null));
+  panel.querySelectorAll('[data-editar-prestamo-admin]').forEach(b=>b.addEventListener('click', ()=>openPrestamoAdminModal(b.dataset.editarPrestamoAdmin)));
+  panel.querySelectorAll('[data-abonar-prestamo-admin]').forEach(b=>b.addEventListener('click', ()=>openAbonoPrestamoAdminModal(b.dataset.abonarPrestamoAdmin)));
+
   const btnNuevaCaja = document.getElementById('btnNuevaCaja');
   if(btnNuevaCaja) btnNuevaCaja.addEventListener('click', ()=>openCajaModal(null));
   panel.querySelectorAll('[data-open-caja]').forEach(b=>b.addEventListener('click', ()=>openCajaModal(b.dataset.openCaja)));
@@ -5980,6 +6178,7 @@ function bindPanelEvents(){
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
       cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
+      prestamosAdmin: state.prestamosAdmin,
     }, null, 2);
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -6023,6 +6222,7 @@ function bindPanelEvents(){
         state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
         state.kits = parsed.kits || [];
         state.prestamos = parsed.prestamos || [];
+        state.prestamosAdmin = parsed.prestamosAdmin || [];
         if(parsed.admins && parsed.admins.length) state.admins = parsed.admins;
         if(parsed.log && parsed.log.length) state.log = parsed.log;
         pushLog(adminUnlocked.nombre, 'Importó copia de seguridad completa', file.name);
