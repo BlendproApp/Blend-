@@ -1056,13 +1056,21 @@ function interpolar(valor, puntos){
   }
   return puntos[puntos.length-1][1]; // plano después del último punto
 }
-const TABLA_PRECIO_PERSONA = [[10,120000],[20,120000],[30,110000],[40,100000],[50,90000],[60,90000],[70,85000],[80,80000],[90,75000],[100,75000],[200,72500],[300,70000]];
+const TABLA_PRECIO_PERSONA = [[10,180000],[20,150000],[30,110000],[40,100000],[50,90000],[60,90000],[70,85000],[80,80000],[90,75000],[100,75000],[200,72500],[300,70000]];
 const TABLA_PRECIO_TRAGO = [[100,35000],[200,33000],[300,30000],[400,28000]];
-const PRECIO_TRAGO_ADICIONAL_FIJO = 35000;
+const PRECIO_TRAGO_ADICIONAL_FIJO = 35000; // trago adicional c/alcohol — precio fijo
+const PRECIO_TRAGO_SIN_ALCOHOL_ADICIONAL_FIJO = 25000; // trago adicional s/alcohol — precio fijo
 const HORAS_BASE_POLITICA = 6;
 const RECARGO_MENOS_HORAS = 1.20; // menos de 6h: prorrateo + 20%
-const RECARGO_HORA_ADICIONAL_UNITARIA = 1.10; // (total/horas) * 1.10
-const DESCUENTO_PAQUETE_MAS_HORAS = 0.95; // 5% menos que pagar horas sueltas
+const RECARGO_HORA_ADICIONAL_UNITARIA = 1.10; // solo para hora extra vendida SUELTA durante el evento (imprevista)
+// Más de 6h contratadas de entrada: sin recargo en las horas extra (van al mismo valor promedio que las primeras 6),
+// y además un descuento creciente sobre el total, porque el ticket es más grande.
+function descuentoPorMasHoras(horasExtra){
+  if(horasExtra<=0) return 0;
+  if(horasExtra<=2) return 0.05; // 7-8h
+  if(horasExtra<=4) return 0.08; // 9-10h
+  return 0.10; // 11h o más
+}
 
 function redondearArribaMil(monto){
   return Math.ceil(monto/1000)*1000;
@@ -1085,8 +1093,9 @@ function calcularBarraLibrePorHoras(personas, horas){
     return redondearArribaMil((total6h / HORAS_BASE_POLITICA * horas) * RECARGO_MENOS_HORAS);
   }
   const horasExtra = horas - HORAS_BASE_POLITICA;
-  const unitHoraExtra = horaAdicionalUnitaria(total6h, HORAS_BASE_POLITICA);
-  return redondearArribaMil((total6h + horasExtra*unitHoraExtra) * DESCUENTO_PAQUETE_MAS_HORAS);
+  const unitHoraBase = total6h / HORAS_BASE_POLITICA; // mismo valor promedio que las primeras 6h, sin recargo
+  const descuento = descuentoPorMasHoras(horasExtra);
+  return redondearArribaMil((total6h + horasExtra*unitHoraBase) * (1 - descuento));
 }
 function precioPorPersonaSegunHoras(personas, horas){
   if(!personas) return precioPorPersonaBase(100);
@@ -1134,8 +1143,8 @@ function seedPresupuestoConfig(){
     precioPersonaAdulto: 75000,
     horasBaseIncluidas: 6,
     precioHoraAdicional: 2000000,
-    precioTragoConAlcohol: 30000,
-    precioTragoSinAlcohol: 23000,
+    precioTragoConAlcohol: PRECIO_TRAGO_ADICIONAL_FIJO,
+    precioTragoSinAlcohol: PRECIO_TRAGO_SIN_ALCOHOL_ADICIONAL_FIJO,
     zonas: [{nombre:'Asunción / Área metropolitana', ajuste:0}],
     incluye: [
       'Bebidas y frutas necesarias, utilizando marcas reconocidas como vodka, espumante, gin, whisky, ron y otros, garantizando la mejor calidad.',
@@ -2658,9 +2667,10 @@ function renderPresupuestos(){
           <div class="field"><label>Precio hora adicional</label><input type="text" inputmode="decimal" class="input-monto" name="precioHoraAdicional" value="${cfg.precioHoraAdicional}"></div>
         </div>
         <div class="field-row">
-          <div class="field"><label>Precio por trago con alcohol (por unidad)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoConAlcohol" value="${cfg.precioTragoConAlcohol}"></div>
-          <div class="field"><label>Precio por trago sin alcohol (por unidad)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoSinAlcohol" value="${cfg.precioTragoSinAlcohol}"></div>
+          <div class="field"><label>Precio trago adicional con alcohol (fijo)</label><input type="text" class="input-monto" value="${fmtMoney(PRECIO_TRAGO_ADICIONAL_FIJO)}" disabled></div>
+          <div class="field"><label>Precio trago adicional sin alcohol (fijo)</label><input type="text" class="input-monto" value="${fmtMoney(PRECIO_TRAGO_SIN_ALCOHOL_ADICIONAL_FIJO)}" disabled></div>
         </div>
+        <div class="section-hint" style="margin-top:-6px;">Estos dos precios son fijos en todo el sistema y no se pueden editar.</div>
         <div class="field"><label>Zonas — una por línea, formato "nombre:ajuste" (0 si no suma nada)</label>
           <textarea name="zonas">${cfg.zonas.map(z=>`${z.nombre}:${z.ajuste}`).join('\n')}</textarea>
         </div>
@@ -2732,8 +2742,8 @@ function presupuestoFormFields(p){
       <div class="field"><label>Precio hora adicional</label><input type="text" inputmode="decimal" class="input-monto" name="precioHoraAdicional" value="${p?p.precioHoraAdicional:cfg.precioHoraAdicional}"></div>
     </div>
     <div class="field-row">
-      <div class="field"><label>Precio trago adicional (c/alcohol)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoConAlcoholRef" value="${p?p.precioTragoConAlcohol:cfg.precioTragoConAlcohol}"></div>
-      <div class="field"><label>Precio trago adicional (s/alcohol)</label><input type="text" inputmode="decimal" class="input-monto" name="precioTragoSinAlcoholRef" value="${p?p.precioTragoSinAlcohol:cfg.precioTragoSinAlcohol}"></div>
+      <div class="field"><label>Precio trago adicional (c/alcohol, fijo)</label><input type="text" class="input-monto" value="${fmtMoney(PRECIO_TRAGO_ADICIONAL_FIJO)}" disabled></div>
+      <div class="field"><label>Precio trago adicional (s/alcohol, fijo)</label><input type="text" class="input-monto" value="${fmtMoney(PRECIO_TRAGO_SIN_ALCOHOL_ADICIONAL_FIJO)}" disabled></div>
     </div>
 
     <label style="display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.4px;">Barra libre</label>
@@ -2903,7 +2913,11 @@ function openPresupuestoModal(id){
             modalEl.querySelector('[name="precioPersonaAdulto2"]').value = precio2.toLocaleString('es-PY');
           }
         }
-        mostrarAviso(`Aplicado: Gs. ${precio.toLocaleString('es-PY')} por persona a ${horas} hora(s) (política: 6h base, -20%/+20% según horas).`);
+        const horasExtraAviso = Math.max(0, horas-HORAS_BASE_POLITICA);
+        const descuentoAviso = descuentoPorMasHoras(horasExtraAviso);
+        const notaHoras = horas<HORAS_BASE_POLITICA ? '+20% por ser menos de 6h'
+          : (horasExtraAviso>0 ? `sin recargo en las horas extra, -${Math.round(descuentoAviso*100)}% sobre el total por ser ${horas}h` : 'tarifa base a 6h');
+        mostrarAviso(`Aplicado: Gs. ${precio.toLocaleString('es-PY')} por persona a ${horas} hora(s) (política: 6h base, ${notaHoras}). El precio de "hora adicional" cargado es solo para extensiones imprevistas durante el evento, con 10% de recargo.`);
       });
 
       modalEl.querySelector('#btnSugerirTragos').addEventListener('click', ()=>{
@@ -2917,7 +2931,6 @@ function openPresupuestoModal(id){
         conCounter = opciones.length;
         bindRemoveTiers(conContainer);
         formatearInputsMonto(conContainer);
-        modalEl.querySelector('[name="precioTragoConAlcoholRef"]').value = PRECIO_TRAGO_ADICIONAL_FIJO.toLocaleString('es-PY');
         mostrarAviso(`Sugerido: ${opciones.map(o=>o.cantidad+' tragos ('+fmtMoney(o.precio)+' c/u)').join(' · ')}. Trago adicional fijo: ${fmtMoney(PRECIO_TRAGO_ADICIONAL_FIJO)}.`);
       });
     },
@@ -2952,8 +2965,8 @@ function openPresupuestoModal(id){
         precioPersonaJoven: parseMonto(form.precioPersonaJoven.value)||cfg.precioPersonaJoven,
         precioPersonaAdulto: parseMonto(form.precioPersonaAdulto.value)||cfg.precioPersonaAdulto,
         horasBaseIncluidas: cfg.horasBaseIncluidas, precioHoraAdicional: parseMonto(form.precioHoraAdicional.value)||cfg.precioHoraAdicional,
-        precioTragoConAlcohol: parseMonto(form.precioTragoConAlcoholRef.value)||cfg.precioTragoConAlcohol,
-        precioTragoSinAlcohol: parseMonto(form.precioTragoSinAlcoholRef.value)||cfg.precioTragoSinAlcohol,
+        precioTragoConAlcohol: PRECIO_TRAGO_ADICIONAL_FIJO,
+        precioTragoSinAlcohol: PRECIO_TRAGO_SIN_ALCOHOL_ADICIONAL_FIJO,
         tragosConAlcohol, tragosSinAlcohol,
         descuentoPercent: Math.min(100, Math.max(0, Number(form.descuentoPercent.value)||0)),
         barraLibre2: form.horas2 ? {
@@ -3088,7 +3101,7 @@ function renderPresupuestoPrint(p){
           <div style="font-weight:700; margin-bottom:6px; color:${VERDE};">Servicios adicionales:</div>
           <div style="font-size:0.87rem; padding-left:4px;">
             <div>Hora adicional: ${fmtMoney(p.precioHoraAdicional)}</div>
-            <div>Trago adicional: ${fmtMoney(p.precioTragoConAlcohol||0)} c/alcohol · ${fmtMoney(p.precioTragoSinAlcohol||0)} s/alcohol</div>
+            ${(tragosConAlcohol.length>0 || tragosSinAlcohol.length>0) ? `<div>Trago adicional: ${fmtMoney(p.precioTragoConAlcohol||0)} c/alcohol · ${fmtMoney(p.precioTragoSinAlcohol||0)} s/alcohol</div>` : ''}
           </div>
         </div>
 
@@ -3273,7 +3286,9 @@ function renderPresupuestoPrint(p){
 
     titulo('Servicios Adicionales:', 12);
     linea(`• Hora adicional : ${fmtMoney(p.precioHoraAdicional)}`, {indent:14});
-    linea(`• Pack adicional : ${fmtMoney(p.precioTragoConAlcohol||0)} C/A. ${fmtMoney(p.precioTragoSinAlcohol||0)} S/A`, {indent:14});
+    if((p.tragosConAlcohol||[]).length>0 || (p.tragosSinAlcohol||[]).length>0){
+      linea(`• Pack adicional : ${fmtMoney(p.precioTragoConAlcohol||0)} C/A. ${fmtMoney(p.precioTragoSinAlcohol||0)} S/A`, {indent:14});
+    }
     espacio(14);
 
     titulo('El servicio incluye:', 12);
@@ -5802,8 +5817,8 @@ function bindPanelEvents(){
       precioPersonaAdulto: parseMonto(f.precioPersonaAdulto.value),
       horasBaseIncluidas: Number(f.horasBaseIncluidas.value)||0,
       precioHoraAdicional: parseMonto(f.precioHoraAdicional.value),
-      precioTragoConAlcohol: parseMonto(f.precioTragoConAlcohol.value),
-      precioTragoSinAlcohol: parseMonto(f.precioTragoSinAlcohol.value),
+      precioTragoConAlcohol: PRECIO_TRAGO_ADICIONAL_FIJO,
+      precioTragoSinAlcohol: PRECIO_TRAGO_SIN_ALCOHOL_ADICIONAL_FIJO,
       zonas: parseZonas(f.zonas.value),
       incluye: parseLineas(f.incluye.value),
       observaciones: parseLineas(f.observaciones.value),
