@@ -668,6 +668,54 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     .card{ background:#fff; border:1px solid #ccc; box-shadow:none; }
     h2,h3,.mark{ color:#1a1a1a !important; }
   }
+
+  /* ===== Gastos e Inversiones ===== */
+  .gx-tabs{ margin-bottom:14px; }
+  .gx-chip{ display:inline-block; padding:2px 8px; border-radius:10px; font-size:0.72rem; background:color-mix(in srgb, var(--c) 22%, transparent); color:var(--cream); border:1px solid color-mix(in srgb, var(--c) 55%, transparent); white-space:nowrap; }
+  .gx-bar{ height:6px; background:var(--ink-3); border-radius:4px; overflow:hidden; margin-top:4px; }
+  .gx-bar i{ display:block; height:100%; border-radius:4px; }
+  .gx-filtros{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:12px; align-items:flex-end; }
+  .gx-fl{ display:flex; flex-direction:column; gap:3px; font-size:0.74rem; color:var(--cream-dim); min-width:130px; }
+  .gx-fl select,.gx-fl input{ background:var(--ink-2); color:var(--cream); border:1px solid var(--line); border-radius:6px; padding:7px 8px; font-size:0.86rem; }
+  .gx-resumen-linea{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; margin-bottom:10px; font-size:0.88rem; }
+  .gx-aviso{ display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:14px; font-size:0.9rem; }
+  .gx-dos{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:820px){ .gx-dos{ grid-template-columns:1fr; } .gx-aviso{ flex-direction:column; align-items:flex-start; } }
+  .gx-h{ font-size:1rem; margin:0 0 10px; }
+  .gx-fila{ margin-bottom:10px; }
+  .gx-fila-top{ display:flex; justify-content:space-between; gap:10px; font-size:0.9rem; }
+  .gx-det summary{ cursor:pointer; list-style:none; }
+  .gx-det summary::-webkit-details-marker{ display:none; }
+  .gx-sub{ padding:4px 0 8px 14px; border-left:2px solid var(--line); margin:2px 0 10px; }
+  .gx-subfila{ display:flex; justify-content:space-between; gap:10px; padding:4px 0; font-size:0.86rem; border-bottom:1px dashed var(--line); }
+  .gx-subfila a{ color:var(--copper-bright); text-decoration:none; }
+  .gx-tabla td,.gx-tabla th{ vertical-align:top; }
+  .gx-flujo{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; font-size:0.86rem; }
+  .gx-flecha{ color:var(--cream-dim); }
+  .gx-cat{ font-size:0.8rem; margin-top:2px; }
+  .gx-sug{ font-size:0.66rem; color:var(--gold); border:1px solid var(--gold); border-radius:8px; padding:0 5px; margin-left:4px; }
+  .gx-det-td{ max-width:260px; font-size:0.86rem; }
+  .gx-grupo-fila td{ background:var(--ink-3); }
+  .gx-evento{ background:var(--ink-2); border:1px solid var(--line); border-radius:10px; margin-bottom:8px; padding:10px 14px; }
+  .gx-evento summary{ cursor:pointer; list-style:none; }
+  .gx-evento summary::-webkit-details-marker{ display:none; }
+  .gx-ev-fila{ display:grid; grid-template-columns:2fr repeat(4,1fr) 1.4fr; gap:10px; align-items:center; }
+  .gx-ev-nombre small,.gx-ev-num small{ display:block; color:var(--cream-dim); font-size:0.7rem; }
+  .gx-ev-num span{ font-size:0.9rem; }
+  @media(max-width:820px){ .gx-ev-fila{ grid-template-columns:1fr 1fr; } }
+  .gx-alerta{ color:var(--red); font-size:0.84rem; }
+  .gx-ok{ color:var(--sage); font-size:0.84rem; }
+  .gx-cuenta{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .gx-cuenta small{ display:block; color:var(--cream-dim); font-size:0.72rem; }
+  @media(max-width:820px){ .gx-cuenta{ grid-template-columns:1fr 1fr; } }
+  .gx-rev summary{ cursor:pointer; list-style:none; }
+  .gx-rev summary::-webkit-details-marker{ display:none; }
+  .gx-count{ background:var(--ink-3); border-radius:10px; padding:1px 8px; font-size:0.78rem; margin-left:6px; }
+  .gx-pills{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:4px 0 14px; }
+  .gx-pill{ background:var(--ink-2); color:var(--cream-dim); border:1px solid var(--line); border-radius:16px; padding:5px 12px; font-size:0.8rem; cursor:pointer; }
+  .gx-pill b{ color:var(--cream); margin-left:2px; }
+  .gx-pill.on{ background:var(--copper); color:#fff; border-color:var(--copper); }
+  .gx-pill.on b{ color:#fff; }
 </style>
 </head>
 <body>
@@ -696,7 +744,7 @@ function todosLosRoles(){ return ROLES.concat(state.rolesExtra||[]); }
 const TIPOS_TRABAJO = ['Logística','Limpieza','Producción'];
 const ACCIONES_LOG_LIMITE = 500;
 
-let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [], prestamos: [], prestamosAdmin: [] };
+let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [], prestamos: [], prestamosAdmin: [], revisados: {} };
 let colaboradorLimitadoUnlocked = null;
 let currentTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
 function toggleTheme(){
@@ -782,7 +830,77 @@ function fmtDate(d){
   const dt = new Date(d+'T00:00:00');
   return dt.toLocaleDateString('es-PY', {day:'2-digit', month:'short', year:'numeric'});
 }
-function todayStr(){ return new Date().toISOString().slice(0,10); }
+function todayStr(){
+  // fecha LOCAL (antes usaba UTC: después de las 21:00 en Paraguay devolvía el día siguiente)
+  const d = new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// ---- horas siempre en formato 24 h ----
+function fmtFechaHora24(ts){
+  const d = new Date(ts);
+  if(isNaN(d)) return '—';
+  const p2 = n=>String(n).padStart(2,'0');
+  return p2(d.getDate())+'/'+p2(d.getMonth()+1)+'/'+String(d.getFullYear()).slice(2)+' '+p2(d.getHours())+':'+p2(d.getMinutes());
+}
+function normalizarHora(v){
+  // acepta "8", "8:30", "2030", "20:30", "8 pm", "8:30 p. m." y devuelve "HH:MM" en 24 h, o '' si no es válida
+  let t = String(v||'').trim().toLowerCase().replace(/\./g,'').replace(/\s+/g,' ');
+  if(!t) return '';
+  let pm = /\bp ?m\b/.test(t), am = /\ba ?m\b/.test(t);
+  t = t.replace(/\b[ap] ?m\b/,'').replace(/hs?$/,'').trim();
+  let h, m;
+  let mm = t.match(/^(\d{1,2})[:h\.,](\d{2})$/);
+  if(mm){ h = Number(mm[1]); m = Number(mm[2]); }
+  else if(/^\d{3,4}$/.test(t)){ h = Number(t.slice(0,-2)); m = Number(t.slice(-2)); }
+  else if(/^\d{1,2}$/.test(t)){ h = Number(t); m = 0; }
+  else return '';
+  if(pm && h<12) h += 12;
+  if(am && h===12) h = 0;
+  if(h>23 || m>59) return '';
+  return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
+}
+function horaTextoA24(texto){
+  // convierte horas con am/pm escritas dentro de un texto libre ("a las 8 pm") a 24 h ("a las 20:00")
+  return String(texto||'').replace(/(\d{1,2})(?:[:\.](\d{2}))?\s*(a\.? ?m\.?|p\.? ?m\.?)/gi, (all,h,mi,ap)=>{
+    const r = normalizarHora(h+(mi?':'+mi:'')+' '+ap.replace(/\./g,'').replace(/\s/g,''));
+    return r || all;
+  });
+}
+// campo de hora de 24 h: se escribe como 2030 o 20:30, siempre queda HH:MM
+document.addEventListener('input', function(e){
+  const el = e.target;
+  if(!(el && el.classList && el.classList.contains('input-hora'))) return;
+  let d = el.value.replace(/[^\d]/g,'').slice(0,4);
+  if(d.length>=3) d = d.slice(0,2)+':'+d.slice(2);
+  el.value = d;
+});
+document.addEventListener('focusout', function(e){
+  const el = e.target;
+  if(!(el && el.classList && el.classList.contains('input-hora'))) return;
+  if(!el.value) return;
+  const h = normalizarHora(el.value);
+  el.value = h;
+  el.style.borderColor = h ? '' : 'var(--red)';
+});
+// ---- evitar movimientos duplicados ----
+function _norm(t){ return String(t||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function buscarDuplicado(coleccion, d, ignorarId){
+  const mismo = (x)=> x.id!==ignorarId;
+  if(coleccion==='cobros') return state.cobros.find(c=>mismo(c) && (c.eventoId||'')===(d.eventoId||'') && c.fecha===d.fecha && Number(c.monto)===Number(d.monto) && c.cajaId===d.cajaId && (c.tipo||'cliente')===(d.tipo||'cliente') && _norm(c.descripcion)===_norm(d.descripcion));
+  if(coleccion==='compras') return state.compras.find(c=>mismo(c) && (c.eventoId||'')===(d.eventoId||'') && c.fecha===d.fecha && Number(c.monto)===Number(d.monto) && c.cajaId===d.cajaId && _norm(c.descripcion)===_norm(d.descripcion) && _norm(c.categoria)===_norm(d.categoria));
+  if(coleccion==='gastos') return state.gastos.find(g=>mismo(g) && g.movimiento===d.movimiento && (g.eventoId||'')===(d.eventoId||'') && g.fecha===d.fecha && Number(g.monto)===Number(d.monto) && g.cajaId===d.cajaId && _norm(g.descripcion)===_norm(d.descripcion) && _norm(g.categoria)===_norm(d.categoria));
+  if(coleccion==='pagos') return state.pagos.find(x=>mismo(x) && x.personaId===d.personaId && x.fecha===d.fecha && Number(x.monto)===Number(d.monto) && x.cajaId===d.cajaId && _norm(x.descripcion)===_norm(d.descripcion));
+  return null;
+}
+function avisarDuplicado(nombre){
+  const msg = 'Ya existe '+nombre+' igual (misma fecha, monto, caja y detalle). No se guardó para no duplicar. Si de verdad es otro movimiento, cambiá la nota o la descripción.';
+  const el = document.getElementById('modalSaveError');
+  if(el){ el.textContent = msg; el.style.display = 'block'; } else { alert(msg); }
+}
+function avisarError(msg){
+  const el = document.getElementById('modalSaveError');
+  if(el){ el.textContent = msg; el.style.display = 'block'; } else { alert(msg); }
+}
 
 function waLink(texto){ return 'https://wa.me/?text=' + encodeURIComponent(texto); }
 function comprobantePagoTexto(pago){
@@ -932,7 +1050,7 @@ async function loadState(intentoNro){
       state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
       state.kits = parsed.kits || [];
       state.prestamos = parsed.prestamos || [];
-      state.prestamosAdmin = parsed.prestamosAdmin || [];
+      state.prestamosAdmin = parsed.prestamosAdmin || []; state.revisados = parsed.revisados || {};
       migrarProduccionAntigua();
       migrarRecetarioNuevosTragos();
       state.insumos.forEach(ins=>{ if(!ins.tipo) ins.tipo = 'herramienta'; });
@@ -1004,7 +1122,7 @@ async function saveState(intentoNro){
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
       cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
-      prestamosAdmin: state.prestamosAdmin,
+      prestamosAdmin: state.prestamosAdmin, revisados: state.revisados || {},
     };
     // red de seguridad: Firestore rechaza el documento ENTERO si algún campo, en cualquier parte, quedó en "undefined"
     // (fue justo lo que pasó con un campo nuevo de préstamos). Este viaje por JSON limpia cualquier "undefined" a null/omitido
@@ -1393,7 +1511,8 @@ function render(){
     ]},
     { id: 'finanzas', label: 'Finanzas', icon: '◉', tabs: [
       ['compras','Compras'],
-      ['gastos','Gastos e Ingresos'],
+      ['gastos','Gastos e Inversiones'],
+      ['revisar','A revisar'+gxBadgeRevisar()],
       ['cobros','Cobros'],
       ['cajas','Cajas'],
       ['prestamosAdmin','Préstamos a Administradores'],
@@ -1511,6 +1630,7 @@ function renderPanel(){
     insumos: renderInsumos,
     prestamos: renderPrestamos,
     gastos: renderGastos,
+    revisar: ()=>{ gxVista='revisar'; return renderGastos(); },
     cajas: renderCajas,
     prestamosAdmin: renderPrestamosAdmin,
     pagos: renderPagos,
@@ -1518,7 +1638,7 @@ function renderPanel(){
     actividad: renderActividad,
     administradores: renderAdministradores,
   };
-  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','cajas','prestamosAdmin','pagos','reportes','actividad','administradores']);
+  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','revisar','cajas','prestamosAdmin','pagos','reportes','actividad','administradores']);
   if(adminOnly.has(currentTab) && !adminUnlocked){
     panel.innerHTML = `<div class="empty">Necesitás ingresar como administrador para ver esta sección.</div>`;
     return;
@@ -1842,8 +1962,8 @@ function eventoFormFields(ev){
       <button type="button" class="btn small ghost" id="btnMostrarNuevoTipoEvento">+ Crear tipo de evento nuevo</button>
     </div>
     <div class="field-row">
-      <div class="field"><label>Horario de inicio del evento</label><input type="time" name="horarioInicio" value="${ev.horarioInicio||''}"></div>
-      <div class="field"><label>Horario de montaje</label><input type="time" name="horarioMontaje" value="${ev.horarioMontaje||''}"></div>
+      <div class="field"><label>Horario de inicio del evento</label><input type="text" class="input-hora" inputmode="numeric" maxlength="5" placeholder="HH:MM (24 h)" name="horarioInicio" value="${ev.horarioInicio||''}"></div>
+      <div class="field"><label>Horario de montaje</label><input type="text" class="input-hora" inputmode="numeric" maxlength="5" placeholder="HH:MM (24 h)" name="horarioMontaje" value="${ev.horarioMontaje||''}"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Precio hora adicional (de este evento)</label><input type="text" inputmode="decimal" class="input-monto" name="precioHoraAdicionalEvento" value="${ev.precioHoraAdicionalEvento||''}"></div>
@@ -1928,8 +2048,8 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
       lugar: form.lugar.value.trim(),
       tipoEvento: form.tipoEvento.value,
       horasEvento: form.horasEvento.value,
-      horarioInicio: form.horarioInicio.value,
-      horarioMontaje: form.horarioMontaje.value,
+      horarioInicio: normalizarHora(form.horarioInicio.value),
+      horarioMontaje: normalizarHora(form.horarioMontaje.value),
       precioHoraAdicionalEvento: parseMonto(form.precioHoraAdicionalEvento.value),
       precioTragoAdicionalEvento: parseMonto(form.precioTragoAdicionalEvento.value),
       adultos, jovenes,
@@ -1988,7 +2108,7 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
     const senaPercentNum = Number(data.senaPercent)||0;
     const montoSenaCalc = (montoTotalNum>0 && senaPercentNum>0) ? Math.round(montoTotalNum * senaPercentNum/100) : 0;
     if(montoSenaCalc<=0) return;
-    const yaTieneSenaRegistrada = state.cobros.some(c=>c.eventoId===eventoObj.id && c.origenSena);
+    const yaTieneSenaRegistrada = state.cobros.some(c=>c.eventoId===eventoObj.id && (c.origenSena || Number(c.monto)===montoSenaCalc || /se[ñn]a/i.test(c.descripcion||'')));
     if(yaTieneSenaRegistrada) return;
     if(!confirm(`Este evento tiene una seña del ${senaPercentNum}% sobre ${fmtMoney(montoTotalNum)} = ${fmtMoney(montoSenaCalc)}.\n¿Registrar este cobro ahora?`)) return;
     if(state.cajas.length===0){ alert('Creá al menos una caja (pestaña "Cajas") para poder registrar el cobro de la seña. El evento se guardó, pero el cobro no se registró.'); return; }
@@ -2132,7 +2252,15 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
             const monto = parseMonto(cf.querySelector('[name="monto"]').value);
             if(!monto || monto<=0){ alert('Cargá un monto válido.'); return; }
             if(state.cajas.length===0){ alert('Creá al menos una caja (pestaña "Cajas") antes de registrar un cobro.'); return; }
+            {
+              const fechaChk = cf.querySelector('[name="fechaCobro"]').value || todayStr();
+              const cajaSelChk = cf.querySelector('[name="cajaId"]');
+              const datosChk = {eventoId: (ev && ev.id) || null, fecha: fechaChk, monto, tipo: cf.querySelector('[name="tipo"]').value, descripcion: cf.querySelector('[name="descripcion"]').value.trim(), cajaId: cajaSelChk ? cajaSelChk.value : state.cajas[0].id};
+              if(datosChk.eventoId && buscarDuplicado('cobros', datosChk, null)){ avisarDuplicado('un cobro'); return; }
+            }
+            if(btnCobro.dataset.guardando==='1') return;
             if(!confirm(`¿Confirmás registrar un cobro de ${fmtMoney(monto)} para este evento?`)) return;
+            btnCobro.dataset.guardando = '1';
             // primero se guardan los cambios del formulario principal (monto total, seña, etc.) para no perderlos
             const formPrincipal = modalEl.querySelector('#modalForm');
             const data = construirDatosEvento(formPrincipal);
@@ -2498,6 +2626,9 @@ function openCobroModal(id){
         tipo: form.tipo.value, descripcion: form.descripcion.value.trim(),
         cajaId: form.cajaId.value, adminId: c ? c.adminId : adminUnlocked.id,
       };
+      if(!data.fecha) return avisarError('Elegí la fecha del cobro.');
+      if(!(data.monto>0)) return avisarError('Ingresá un monto mayor a cero.');
+      if(buscarDuplicado('cobros', data, c ? c.id : null)) return avisarDuplicado('un cobro');
       const evNombre = (eventosDe(data.eventoId)||{}).lugar || '(sin lugar)';
       const cajaNombre = (state.cajas.find(x=>x.id===data.cajaId)||{}).nombre || '';
       if(c){ Object.assign(c, data); pushLog(adminUnlocked.nombre, 'Cobro editado', `${fmtMoney(data.monto)} (${data.tipo}) — ${evNombre} — ${cajaNombre}`); }
@@ -2734,7 +2865,7 @@ function presupuestoFormFields(p){
     <div class="field"><label>Cliente</label><input type="text" name="cliente" value="${p?(p.cliente||''):''}" placeholder="Ej: Familia Giménez"></div>
     <div class="field-row">
       <div class="field"><label>Fecha del evento</label><input type="date" name="fecha" value="${p?(p.fecha||''):''}"></div>
-      <div class="field"><label>Horario</label><input type="text" name="horario" value="${p?(p.horario||''):''}" placeholder="Ej: a confirmar, 20:00hs…"></div>
+      <div class="field"><label>Horario</label><input type="text" name="horario" value="${p?(p.horario||''):''}" placeholder="Ej: a confirmar, 20:00 hs (formato 24 h)"></div>
     </div>
     <div class="field-row">
       <div class="field"><label>Ciudad</label>
@@ -2967,7 +3098,7 @@ function openPresupuestoModal(id){
         adminId: presupuestoExistente ? presupuestoExistente.adminId : adminUnlocked.id,
         eventoId: (document.getElementById('pEvento')||{}).value || (presupuestoExistente ? presupuestoExistente.eventoId : null) || null,
         nombreEvento: form.nombreEvento.value.trim(),
-        cliente: form.cliente.value.trim(), fecha: form.fecha.value, horario: form.horario.value.trim(),
+        cliente: form.cliente.value.trim(), fecha: form.fecha.value, horario: horaTextoA24(form.horario.value.trim()),
         ciudad: form.ciudad.value, lugar: form.lugar.value.trim(),
         horas: Number(form.horas.value)||cfg.horasBaseIncluidas,
         zonaNombre: zona.nombre, zonaAjuste: zona.ajuste,
@@ -3896,7 +4027,7 @@ function renderCompras(){
           <td>${c.eventoId ? (ev?ev.lugar||'(sin lugar)':'(evento eliminado)') : '—'}</td>
           <td>${caja?caja.nombre:'—'}</td>
           <td>${c.descripcion||'—'}</td>
-          <td>${c.categoria||'—'}</td>
+          <td>${gxEtiquetaCat(c,'compra')}</td>
           <td style="color:var(--cream-dim);">${adminC?adminC.nombre:'—'}</td>
           <td class="mono">${fmtMoney(c.monto)}</td>
           <td><button class="btn small ghost" data-open-compra="${c.id}">Editar</button></td>
@@ -3932,7 +4063,7 @@ function compraFormFields(c){
       <select name="cajaId">${cajasDisponibles().map(cc=>`<option value="${cc.id}" ${(c.cajaId||cajaSugerida)===cc.id?'selected':''}>${cc.nombre}</option>`).join('')}</select>
     </div>
     <div class="field"><label>Descripción</label><input type="text" name="descripcion" value="${c.descripcion||''}" placeholder="Ítems, hielo, decoración…"></div>
-    <div class="field"><label>Categoría (opcional)</label><input type="text" name="categoria" value="${c.categoria||''}"></div>
+    ${gxCamposTraza(c, 'egreso_compra', true)}
     <div class="field-row">
       <div class="field"><label>¿Suma stock de un ítem? (opcional)</label>
         <select name="insumoId" id="compraInsumoSelect" ${bloqueadoStock?'disabled':''}>
@@ -3957,6 +4088,7 @@ function openCompraModal(id){
       const tipoSel = modalEl.querySelector('#compraTipo');
       const wrap = modalEl.querySelector('#compraEventoWrap');
       tipoSel.addEventListener('change', ()=>{ wrap.style.display = tipoSel.value==='evento' ? '' : 'none'; });
+      gxEnlazarFormulario(modalEl, 'compra');
 
       const btnNuevoItem = modalEl.querySelector('#btnCompraNuevoItem');
       if(btnNuevoItem){
@@ -3995,13 +4127,20 @@ function openCompraModal(id){
     onSave: (form)=>{
       const tipoCompra = form.tipoCompra.value;
       if(tipoCompra==='evento' && !form.eventoId.value){ alert('Elegí el evento, o cambiá el tipo a "Empresa" si esta compra no es de un evento en particular.'); return; }
+      const errT = gxValidarTraza(form, c, 'egreso', form.descripcion.value, parseMonto(form.monto.value), !!(form.insumoId && form.insumoId.value));
+      if(errT) return avisarError(errT);
       const data = {
         tipo: tipoCompra,
         eventoId: tipoCompra==='evento' ? form.eventoId.value : null,
         fecha: form.fecha.value, monto: parseMonto(form.monto.value),
-        descripcion: form.descripcion.value.trim(), categoria: form.categoria.value.trim(),
+        descripcion: form.descripcion.value.trim(),
         cajaId: form.cajaId.value, adminId: c ? c.adminId : adminUnlocked.id,
       };
+      Object.assign(data, gxLeerTraza(form, c));
+      if(!(c && c.id)) data.ts = Date.now();
+      if(!data.fecha) return avisarError('Elegí la fecha de la compra.');
+      if(!(data.monto>0)) return avisarError('Ingresá un monto mayor a cero.');
+      if(buscarDuplicado('compras', data, c ? c.id : null)) return avisarDuplicado('una compra');
       const bloqueadoStock = !!(c && c.id && c.insumoId);
       if(bloqueadoStock){
         data.insumoId = c.insumoId; data.insumoCantidad = c.insumoCantidad;
@@ -4552,47 +4691,868 @@ function openInsumoModal(id){
 }
 
 // ================= GASTOS E INVERSIONES =================
+// ================= GASTOS E INVERSIONES — catálogo, clasificación y libro de movimientos =================
+// Todo lo que está acá LEE los datos existentes sin modificarlos. La clasificación de lo viejo se calcula al vuelo;
+// solo se guarda una categoría (campo "cat") cuando alguien la confirma o carga un movimiento nuevo.
+const GX_GRUPOS = {
+  ins:{label:'Insumos de barra', color:'#c8963e', nat:'gasto'},
+  evt:{label:'Operación de eventos', color:'#5f9ea0', nat:'gasto'},
+  per:{label:'Personal y comisiones', color:'#8a7fb8', nat:'gasto'},
+  cli:{label:'Clientes', color:'#c0706b', nat:'gasto'},
+  emp:{label:'Empresa', color:'#7d8f6a', nat:'gasto'},
+  inv:{label:'Inversiones', color:'#d4af6a', nat:'inversion'},
+  ing:{label:'Ingresos', color:'#57895e', nat:'ingreso'},
+  int:{label:'Movimientos internos', color:'#7b8fa6', nat:'interno'},
+  sin:{label:'Sin clasificar', color:'#9a9a90', nat:'gasto'},
+};
+// sugiereEvento: este tipo de gasto casi siempre es de un evento puntual
+const GX_CATS = {
+  ins_alcohol:{g:'ins', label:'Destilados y alcohol'},
+  ins_frutas:{g:'ins', label:'Frutas, hierbas y flores'},
+  ins_hielo:{g:'ins', label:'Hielo', sugiereEvento:true},
+  ins_agua:{g:'ins', label:'Agua, tónica y gaseosas'},
+  ins_super:{g:'ins', label:'Supermercado y otros insumos'},
+  evt_flete:{g:'evt', label:'Flete y transporte', sugiereEvento:true},
+  evt_comida:{g:'evt', label:'Comida del equipo', sugiereEvento:true},
+  evt_impresion:{g:'evt', label:'Cartas e impresiones', sugiereEvento:true},
+  evt_otros:{g:'evt', label:'Otros gastos de evento', sugiereEvento:true},
+  per_sueldo:{g:'per', label:'Sueldos y refuerzos'},
+  per_comision:{g:'per', label:'Comisiones'},
+  per_pago:{g:'per', label:'Pagos al equipo (reportes)'},
+  cli_regalo:{g:'cli', label:'Regalos y atenciones'},
+  cli_reunion:{g:'cli', label:'Reuniones con clientes'},
+  emp_alquiler:{g:'emp', label:'Alquiler'},
+  emp_prof:{g:'emp', label:'Servicios profesionales'},
+  emp_mkt:{g:'emp', label:'Marketing y publicidad'},
+  emp_otros:{g:'emp', label:'Otros gastos de la empresa'},
+  inv_barra:{g:'inv', label:'Barra y mobiliario'},
+  inv_equip:{g:'inv', label:'Equipamiento y utensilios'},
+  inv_otra:{g:'inv', label:'Otra inversión'},
+  ing_cobro:{g:'ing', label:'Cobro de eventos'},
+  ing_prestamo:{g:'ing', label:'Préstamos y alquileres de ítems'},
+  ing_venta:{g:'ing', label:'Venta de inventario y bebidas'},
+  ing_otro:{g:'ing', label:'Otros ingresos'},
+  int_transf:{g:'int', label:'Transferencia entre cajas'},
+  int_prestadm:{g:'int', label:'Préstamo a administrador'},
+  int_abono:{g:'int', label:'Devolución de préstamo de administrador'},
+  sin:{g:'sin', label:'Sin clasificar'},
+};
+const GX_PRIORIDAD_ALTA = new Set(['cli_regalo']);
+const GX_REGLAS = [
+  ['cli_regalo', /regalo|obsequio/],
+  ['inv_barra', /barra curv|estante|carrito|tabla|pintura|aguarras|tapiceri|\btela\b|\bled\b|ferrex|ferbasan|fer basan|estano|\bcable\b|\bficha\b|carpicenter|madera|hierro|mueble|mesada/],
+  ['inv_equip', /caja de plastico|copas|\bpalas?\b|coctelera|utensilio|licuadora|hielera|molecular|herramienta|\bjarra/],
+  ['evt_impresion', /impresion|imprimir|\bcartas?\b|papel de arroz|plantilla|folleto|banner/],
+  ['evt_flete', /flete|\bbolt\b|combustible|\bcombu\b|camion|nafta|peaje|\buber\b|\bmoto\b|transporte/],
+  ['evt_comida', /comida|almuerzo|\bcena\b|empanada|asado|merienda|desayuno|arabe|sandwich|pizza|hamburguesa/],
+  ['ins_hielo', /hielo/],
+  ['ins_agua', /\bagua\b|tonica|gaseosa|bidon|\bcapri\b/],
+  ['ins_alcohol', /destilado|alcohol|whisky|jhonnie|johnnie|\bgin\b|aperol|espumante|pisco|vodka|tequila|vermut|licor|\bron\b|cerveza|\bvino\b|champagne|jack daniel|bombay|absolut|spritz/],
+  ['ins_frutas', /fruta|frutos rojos|pomelo|limon|\bpina\b|mburucuya|menta|romero|abasto|navegantes|verdura|flores|yerba buena|jengibre|casa rica|naranja|pepino|albahaca/],
+  ['ins_super', /super mas|supermercado|biggie|azucar|yerba|almacen|limpieza|descartable|servilleta|\bcinta\b|detergente|jabon/],
+  ['per_sueldo', /sueldo|refuerzo|jornal|pago (a )?(oscar|elias)/],
+  ['per_comision', /comision/],
+  ['emp_alquiler', /alquiler|pago a barby/],
+  ['emp_prof', /contador|honorario|abogado|escribano|contable|tramite|municipal|patente/],
+  ['cli_reunion', /reunion con cliente|cafeteria|\bcafe\b/],
+  ['emp_mkt', /publicidad|anuncio|meta ads|instagram|marketing|pauta|fotograf/],
+];
+const GX_GENERICAS = new Set(['', 'gasto', 'gastos', 'gasto diario', 'gastos varios', 'gastos varios', 'varios', 'compra', 'compras', 'otros']);
+
+function gxNorm(t){ return String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function gxEsc(t){ return String(t==null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function gxCatInfo(cat){ const c = GX_CATS[cat] || GX_CATS.sin; return {id: GX_CATS[cat]?cat:'sin', label:c.label, g:c.g, grupo:GX_GRUPOS[c.g], sugiereEvento:!!c.sugiereEvento}; }
+function gxNat(cat){ return gxCatInfo(cat).grupo.nat; }
+
+// Clasifica un movimiento ya cargado (gasto o compra). Nunca modifica el original.
+function gxClasificar(o, fuente){
+  if(o.cat && GX_CATS[o.cat]) return {cat:o.cat, conf:'manual', nota:''};
+  if(o.transferenciaId || gxNorm(o.categoria)==='transferencia entre cajas') return {cat:'int_transf', conf:'alta', nota:''};
+  if(fuente==='gasto' && o.movimiento==='ingreso'){
+    const venta = o.origenIngreso==='inventario' || o.origenIngreso==='premix' || /venta/.test(gxNorm(o.categoria+' '+o.descripcion));
+    return {cat: venta?'ing_venta':'ing_otro', conf: venta?'alta':'media', nota:''};
+  }
+  let txt = gxNorm((o.categoria||'')+' | '+(o.descripcion||''));
+  txt = txt.replace(/\b(con y sin|sin|con) alcohol\b/g,'');
+  if(o.insumoId){ const ins = (state.insumos||[]).find(i=>i.id===o.insumoId); if(ins) txt += ' '+gxNorm(ins.nombre); }
+  const hits = [];
+  GX_REGLAS.forEach(([cat, re])=>{ if(re.test(txt) && !hits.includes(cat)) hits.push(cat); });
+  const etiquetaDice = gxNorm(o.categoria);
+  let res;
+  if(hits.length===0){
+    res = /inversion/.test(etiquetaDice) ? {cat:'inv_otra', conf:'media', nota:'La categoría original dice "Inversión", pero no hay detalle para saber qué se compró.'}
+        : {cat:'sin', conf:'baja', nota: GX_GENERICAS.has(etiquetaDice) ? 'La categoría original ("'+(o.categoria||'vacía')+'") no dice qué fue.' : 'No se pudo deducir la categoría.'};
+  } else {
+    const top = hits[0];
+    const conf = (hits.length===1 || GX_PRIORIDAD_ALTA.has(top)) ? 'alta' : 'media';
+    res = {cat:top, conf, nota: conf==='media' ? 'Mezcla varias cosas: '+hits.map(h=>GX_CATS[h].label).join(', ')+'.' : ''};
+    if(/inversion/.test(etiquetaDice) && gxNat(top)!=='inversion'){ res.conf='media'; res.nota = 'Estaba como "Inversión", pero parece un gasto de "'+GX_CATS[top].label+'".'; }
+  }
+  return res;
+}
+function gxEtiquetaCat(o, fuente){ return gxCatInfo(gxClasificar(o, fuente).cat).label; }
+
+function gxCajaNombre(id){ const c = (state.cajas||[]).find(x=>x.id===id); return c ? c.nombre : '(caja eliminada)'; }
+function gxAdminNombre(id){ const a = (state.admins||[]).find(x=>x.id===id); return a ? a.nombre : '—'; }
+function gxEventoNombre(id){ const e = id ? eventosDe(id) : null; return e ? ((e.lugar||'(sin lugar)')) : (id ? '(evento eliminado)' : ''); }
+function gxDias(a, b){ if(!a||!b) return 9999; return Math.round((new Date(a+'T00:00:00') - new Date(b+'T00:00:00'))/86400000); }
+function gxMes(f){ return (f||'').slice(0,7); }
+
+// Libro único: junta gastos, compras, pagos al equipo, cobros y préstamos a administradores.
+function gxLibro(){
+  const out = [];
+  const n = x=>Number(x)||0;
+  const cajaIds = new Set((state.cajas||[]).map(c=>c.id));
+  const transf = {}; (state.transferenciasCaja||[]).forEach(t=>{ transf[t.id]=t; });
+  function base(e){
+    e.monto = n(e.monto); e.grupo = gxCatInfo(e.cat).g; e.nat = gxNat(e.cat);
+    e.cajaOk = cajaIds.has(e.cajaId); e.key = e.fuente+':'+e.ref; e.ts = e.ts||0;
+    out.push(e); return e;
+  }
+  (state.gastos||[]).forEach(g=>{
+    const cl = gxClasificar(g,'gasto');
+    const ing = g.movimiento==='ingreso';
+    const e = {fuente:'gasto', ref:g.id, fecha:g.fecha, signo: ing?1:-1, monto:g.monto, cajaId:g.cajaId, adminId:g.adminId, eventoId:g.eventoId||null,
+      centro: g.tipo||'empresa', cat:cl.cat, conf:cl.conf, nota:cl.nota, detalle:g.descripcion||'', catOriginal:g.categoria||'', proveedor:g.proveedor||'',
+      comprobante:g.comprobante||'', comprobanteRef:g.comprobanteRef||'', metodoPago:g.metodoPago||'', ts:g.ts, obj:g, compromiso:n(g.compromisoTotal)};
+    if(g.transferenciaId){
+      const t = transf[g.transferenciaId];
+      e.oculto = ing;
+      e.org = ing ? 'Caja '+gxCajaNombre(t?t.cajaOrigenId:null) : 'Caja '+gxCajaNombre(g.cajaId);
+      e.dst = ing ? 'Caja '+gxCajaNombre(g.cajaId) : 'Caja '+gxCajaNombre(t?t.cajaDestinoId:null);
+      e.centro = null;
+    } else if(ing){
+      e.org = cl.cat==='ing_venta' ? 'Venta (inventario/bebidas)' : 'Ingreso externo'; e.dst = 'Caja '+gxCajaNombre(g.cajaId);
+    } else { e.org = 'Caja '+gxCajaNombre(g.cajaId); e.dst = g.proveedor || ''; }
+    base(e);
+  });
+  (state.compras||[]).forEach(c=>{
+    const cl = gxClasificar(c,'compra');
+    base({fuente:'compra', ref:c.id, fecha:c.fecha, signo:-1, monto:c.monto, cajaId:c.cajaId, adminId:c.adminId, eventoId:c.eventoId||null,
+      centro: c.tipo || (c.eventoId?'evento':'empresa'), cat:cl.cat, conf:cl.conf, nota:cl.nota, detalle:c.descripcion||'', catOriginal:c.categoria||'', proveedor:c.proveedor||'',
+      comprobante:c.comprobante||'', comprobanteRef:c.comprobanteRef||'', metodoPago:c.metodoPago||'', ts:c.ts, obj:c,
+      org:'Caja '+gxCajaNombre(c.cajaId), dst:c.proveedor||'', insumoId:c.insumoId||null});
+  });
+  (state.pagos||[]).forEach(p=>{
+    const per = personaDe(p.personaId);
+    base({fuente:'pago', ref:p.id, fecha:p.fecha, signo:-1, monto:p.monto, cajaId:p.cajaId, adminId:p.adminId, eventoId:p.eventoId||null,
+      centro: p.eventoId?'evento':'empresa', cat:'per_pago', conf:'alta', nota:'', detalle:p.descripcion||'', catOriginal:'', proveedor: per?per.nombre:'(persona eliminada)',
+      org:'Caja '+gxCajaNombre(p.cajaId), dst:(per?per.nombre:'(persona eliminada)')+' (equipo)', obj:p});
+  });
+  (state.cobros||[]).forEach(c=>{
+    const pr = c.prestamoId ? (state.prestamos||[]).find(x=>x.id===c.prestamoId) : null;
+    const quien = c.tipo==='planner' ? 'Planner' : (c.tipo==='prestamo' ? 'Préstamo/alquiler' : 'Cliente');
+    const donde = pr ? pr.tercero : gxEventoNombre(c.eventoId);
+    base({fuente:'cobro', ref:c.id, fecha:c.fecha, signo:1, monto:c.monto, cajaId:c.cajaId, adminId:c.adminId, eventoId:c.eventoId||null,
+      centro: c.eventoId?'evento':'empresa', cat: c.tipo==='prestamo' ? 'ing_prestamo' : 'ing_cobro', conf:'alta', nota:'',
+      detalle:c.descripcion||'', catOriginal:'', proveedor:quien, org: quien+(donde?' · '+donde:''), dst:'Caja '+gxCajaNombre(c.cajaId), obj:c});
+  });
+  (state.prestamosAdmin||[]).forEach(pr=>{
+    const adm = gxAdminNombre(pr.adminId);
+    if(!pr.esHistorico && pr.cajaId){
+      base({fuente:'prestamoAdmin', ref:pr.id, fecha:pr.fecha, signo:-1, monto:pr.monto, cajaId:pr.cajaId, adminId:pr.creadoPorAdminId, eventoId:null, centro:null,
+        cat:'int_prestadm', conf:'alta', nota:'', detalle:pr.motivo||'', catOriginal:'', proveedor:adm, org:'Caja '+gxCajaNombre(pr.cajaId), dst:'Préstamo a '+adm, obj:pr});
+    }
+    (pr.pagos||[]).forEach((pg,i)=>{
+      base({fuente:'abonoPrestamoAdmin', ref:pr.id+'#'+i, fecha:pg.fecha||pr.fecha, signo:1, monto:pg.monto, cajaId:pg.cajaId, adminId:pg.adminId||pr.creadoPorAdminId, eventoId:null, centro:null,
+        cat:'int_abono', conf:'alta', nota:'', detalle:pg.nota||pg.descripcion||'', catOriginal:'', proveedor:adm, org:'Devolución de '+adm, dst:'Caja '+gxCajaNombre(pg.cajaId), obj:pr});
+    });
+  });
+  return out;
+}
+
+// Extracto de una caja con saldo corrido. Dentro de un mismo día no se conoce el orden real: se usa la hora de carga cuando existe.
+function gxExtractoCaja(libro, cajaId){
+  const caja = (state.cajas||[]).find(c=>c.id===cajaId);
+  const ini = caja ? (Number(caja.saldoInicial)||0) : 0;
+  const filas = libro.map((e,i)=>({e,i})).filter(x=>x.e.cajaId===cajaId)
+    .sort((a,b)=> (a.e.fecha||'').localeCompare(b.e.fecha||'') || (a.e.ts-b.e.ts) || (a.i-b.i));
+  let saldo = ini, min = ini, minFecha = '';
+  const rows = filas.map(({e})=>{ saldo += e.signo*e.monto; if(saldo<min){ min=saldo; minFecha=e.fecha; } return {e, saldo}; });
+  return {ini, rows, final:saldo, min, minFecha};
+}
+
+function gxFiltrarPeriodo(libro, mes){ return mes ? libro.filter(e=>gxMes(e.fecha)===mes) : libro; }
+function gxMeses(libro){ return [...new Set(libro.map(e=>gxMes(e.fecha)).filter(Boolean))].sort().reverse(); }
+
+// Totales de una lista de movimientos. Los internos (transferencias, préstamos entre socios) quedan aparte.
+function gxTotales(lista){
+  const t = {ing:0, gasto:0, inversion:0, personal:0, internoIn:0, internoOut:0, porGrupo:{}, porCat:{}, ingPorCat:{}, n:0};
+  lista.forEach(e=>{
+    if(e.oculto && e.nat==='interno'){ t.internoIn += e.monto; return; }
+    t.n++;
+    if(e.nat==='interno'){ if(e.signo<0) t.internoOut += e.monto; else t.internoIn += e.monto; return; }
+    if(e.nat==='ingreso'){ t.ing += e.monto; t.ingPorCat[e.cat] = (t.ingPorCat[e.cat]||0) + e.monto; return; }
+    if(e.signo>0){ t.ing += e.monto; t.ingPorCat[e.cat] = (t.ingPorCat[e.cat]||0) + e.monto; return; }
+    if(e.nat==='inversion') t.inversion += e.monto; else if(e.grupo==='per') t.personal += e.monto; else t.gasto += e.monto;
+    t.porGrupo[e.grupo] = (t.porGrupo[e.grupo]||0) + e.monto;
+    t.porCat[e.cat] = t.porCat[e.cat] || {total:0, n:0}; t.porCat[e.cat].total += e.monto; t.porCat[e.cat].n++;
+  });
+  t.egresos = t.gasto + t.personal + t.inversion;
+  t.resultadoOperativo = t.ing - t.gasto - t.personal;
+  t.neto = t.ing - t.egresos;
+  return t;
+}
+
+// Pagos parciales: devuelve cuánto se acordó en total y cuánto falta, si se puede saber.
+function gxCompromiso(e){
+  if(e.compromiso>0) return {total:e.compromiso, estimado:false};
+  const m = (e.detalle+' '+e.catOriginal).match(/monto total\s*:?\s*(?:gs\.?\s*)?([\d\.]+)/i);
+  if(m){ const v = Number(m[1].replace(/\./g,'')); if(v>=e.monto) return {total:v, estimado:false}; }
+  if(/\b50 ?%/.test(e.detalle+' '+e.catOriginal) && /se[ñn]a|adelanto|anticipo|\b50 ?%/i.test(e.detalle+' '+e.catOriginal) && !/final/i.test(e.detalle+' '+e.catOriginal)) return {total:e.monto*2, estimado:true};
+  return null;
+}
+
+// Cosas para revisar: cada una es una pista, no una acusación.
+function gxRevisiones(libro){
+  const rev = [];
+  const push = (tipo, sev, e, msg)=>rev.push({tipo, sev, e, msg, k:tipo+'|'+e.key});
+  const reem = (state.gastosPersonal||[]).filter(x=>x.pagado);
+  const stop = new Set(['gasto','gastos','compra','compras','evento','empresa','varios','para','cosas']);
+  const tokens = t=>gxNorm(t).split(/[^a-z0-9]+/).filter(w=>w.length>=5 && !stop.has(w));
+  const vistos = {};
+  const hoy = todayStr();
+  libro.forEach(e=>{
+    if(e.oculto) return;
+    const egreso = e.signo<0 && e.nat!=='interno';
+    if(egreso && e.conf==='baja') push('sin_clasificar','media',e,e.nota||'No se pudo deducir la categoría.');
+    if(egreso && e.conf==='media') push('categoria_dudosa','baja',e,e.nota||'Categoría sugerida a confirmar.');
+    if(egreso && (e.fuente==='gasto'||e.fuente==='compra') && !e.detalle.trim() && !e.insumoId) push('sin_detalle','media',e,'No dice para qué fue.');
+    if(egreso && (e.fuente==='gasto'||e.fuente==='compra') && e.monto>=500000 && e.comprobante!=='si' && e.comprobante!=='na') push('sin_comprobante','baja',e,'Egreso de Gs. '+e.monto.toLocaleString('es-PY')+' sin comprobante registrado.');
+    if(e.fecha && e.fecha>hoy) push('fecha_futura','media',e,'La fecha es posterior a hoy.');
+    if(e.ts && e.fecha){ const carga = new Date(e.ts); const cf = carga.getFullYear()+'-'+String(carga.getMonth()+1).padStart(2,'0')+'-'+String(carga.getDate()).padStart(2,'0'); if(gxDias(cf, e.fecha)>3) push('carga_tardia','baja',e,'Se cargó '+gxDias(cf,e.fecha)+' días después de su fecha.'); }
+    if(!e.cajaOk) push('caja_inexistente','alta',e,'La caja de este movimiento ya no existe: no suma a ninguna caja.');
+    if(e.eventoId && !eventosDe(e.eventoId)) push('evento_inexistente','media',e,'El evento asociado fue eliminado.');
+    if(egreso && e.fuente!=='pago' && e.centro==='empresa' && /\bevento\b/.test(gxNorm(e.detalle+' '+e.catOriginal))) push('empresa_de_evento','baja',e,'Dice "evento" pero está como gasto de empresa: si fue para uno, asignalo para ver su margen.');
+    if(egreso && e.fuente==='gasto'){
+      const tg = tokens(e.detalle+' '+e.catOriginal);
+      reem.forEach(r=>{
+        if(Number(r.monto)===e.monto && Math.abs(gxDias(e.fecha, r.fecha))<=3 && tokens(r.descripcion).some(w=>tg.includes(w))) push('doble_registro','alta',e,'Mismo monto y fecha que un reembolso ya pagado al equipo ("'+(r.descripcion||'').slice(0,50)+'"). Si es la misma compra, quedó descontada dos veces.');
+      });
+    }
+    if(egreso && (e.fuente==='gasto'||e.fuente==='compra')){
+      const k = [e.fecha, e.monto, e.cajaId].join('|');
+      (vistos[k] = vistos[k]||[]).push(e);
+    }
+    if(e.nat==='inversion' && e.signo<0){
+      const c = gxCompromiso(e);
+      if(c) push('pago_parcial','media',e,'Pago parcial: se acordó '+(c.estimado?'(estimado) ':'')+'Gs. '+c.total.toLocaleString('es-PY')+', falta Gs. '+(c.total-e.monto).toLocaleString('es-PY')+'.');
+    }
+  });
+  const dupMarcado = new Set();
+  Object.values(vistos).forEach(l=>{ if(l.length>1 && new Set(l.map(x=>x.fuente)).size>1) l.forEach(e=>{ dupMarcado.add(e.key); push('posible_duplicado','alta',e,'Hay otro movimiento (gasto y compra) con la misma fecha, monto y caja.'); }); });
+  // mismo día, monto y texto en cajas distintas
+  const porTexto = {};
+  libro.filter(e=>!e.oculto && e.signo<0 && e.nat!=='interno' && (e.fuente==='gasto'||e.fuente==='compra') && gxNorm(e.detalle).length>=4).forEach(e=>{ const k=[e.fecha,e.monto,gxNorm(e.detalle)].join('|'); (porTexto[k]=porTexto[k]||[]).push(e); });
+  Object.values(porTexto).forEach(l=>{ if(l.length>1) l.forEach(e=>{ if(!dupMarcado.has(e.key)){ dupMarcado.add(e.key); push('posible_duplicado','media',e,'Hay otro movimiento con la misma fecha, monto y descripción (en '+l.filter(x=>x!==e).map(x=>gxCajaNombre(x.cajaId)).join(', ')+').'); } }); });
+  const mediana = a=>{ const v=a.slice().sort((x,y)=>x-y); const m=Math.floor(v.length/2); return v.length? (v.length%2? v[m] : (v[m-1]+v[m])/2) : 0; };
+  const fmt = v=>'Gs. '+Number(v).toLocaleString('es-PY');
+  // ---- pagos al equipo
+  const pagos = libro.filter(e=>e.fuente==='pago');
+  const pp = {};
+  pagos.forEach(e=>{ const k=[e.proveedor,e.fecha,e.monto].join('|'); (pp[k]=pp[k]||[]).push(e); });
+  Object.values(pp).forEach(l=>{ if(l.length>1) l.forEach(e=>push('pago_duplicado','alta',e,'Hay '+l.length+' pagos iguales a '+e.proveedor+' el mismo día por '+fmt(e.monto)+'. Si fue uno solo, está descontado de más.')); });
+  const porPersona = {};
+  pagos.forEach(e=>{ (porPersona[e.proveedor]=porPersona[e.proveedor]||[]).push(e); });
+  Object.entries(porPersona).forEach(([nom,l])=>{ if(l.length>=3){ const m=mediana(l.map(x=>x.monto)); l.forEach(e=>{ if(m>0 && e.monto>=2.5*m && e.monto>=300000) push('pago_atipico','baja',e,'Pago de '+fmt(e.monto)+' a '+nom+': su pago habitual ronda '+fmt(m)+'.'); }); } });
+  pagos.filter(e=>e.proveedor==='(persona eliminada)').forEach(e=>push('pago_persona_eliminada','media',e,'La persona a la que se pagó ya no existe en Equipo.'));
+  const sinEv = pagos.filter(e=>!e.eventoId);
+  if(sinEv.length>0){ const tot=sinEv.reduce((a,x)=>a+x.monto,0); push('pagos_sin_evento','baja',{key:'resumen:pagos_sin_evento', fuente:'resumen', ref:'pagos', fecha:'', signo:-1, monto:tot, nat:'gasto', cat:'per_pago', cajaId:null, adminId:null, detalle:sinEv.length+' pagos al equipo sin evento asignado', org:'—', dst:'', conf:'alta', synthetic:true},'No se puede calcular el costo de personal de cada evento. Al cargar un pago nuevo, elegí el evento.'); }
+  // ---- cargas en caja ajena
+  libro.forEach(e=>{
+    if(e.oculto || !e.cajaOk || !e.adminId || e.nat==='interno') return;
+    if(e.fuente!=='gasto' && e.fuente!=='compra' && e.fuente!=='pago') return;
+    const caja = (state.cajas||[]).find(c=>c.id===e.cajaId);
+    if(caja && caja.administradorId && caja.administradorId!==e.adminId) push('carga_caja_ajena','baja',e,gxAdminNombre(e.adminId)+' cargó este movimiento en la caja de '+gxAdminNombre(caja.administradorId)+'. Confirmá con el dueño de la caja.');
+  });
+  // ---- montos atípicos por categoría
+  const porCategoria = {};
+  libro.filter(e=>!e.oculto && e.signo<0 && e.nat==='gasto' && e.grupo!=='per' && e.grupo!=='sin' && (e.fuente==='gasto'||e.fuente==='compra')).forEach(e=>{ (porCategoria[e.cat]=porCategoria[e.cat]||[]).push(e); });
+  Object.entries(porCategoria).forEach(([c,l])=>{ if(l.length>=5){ const m=mediana(l.map(x=>x.monto)); l.forEach(e=>{ if(m>0 && e.monto>=4*m && e.monto>=300000) push('monto_atipico','baja',e,fmt(e.monto)+' es mucho más que lo habitual en "'+gxCatInfo(c).label+'" (mediana '+fmt(m)+').'); }); } });
+  // ---- ingresos sin explicación
+  libro.filter(e=>!e.oculto && e.fuente==='gasto' && e.signo>0 && e.nat!=='interno' && !e.detalle.trim() && !e.obj.insumoId).forEach(e=>push('sin_detalle','media',e,'Ingreso sin explicar de dónde vino.'));
+  // ---- transferencias entre cajas
+  (state.transferenciasCaja||[]).filter(t=>t.estado==='aceptada').forEach(t=>{
+    const patas = libro.filter(e=>e.fuente==='gasto' && e.obj.transferenciaId===t.id);
+    if(patas.length!==2) push('transferencia_incompleta','alta',{key:'transferencia:'+t.id, fuente:'transferencia', ref:t.id, fecha:t.fecha, signo:-1, monto:Number(t.monto)||0, nat:'interno', cat:'int_transf', cajaId:t.cajaOrigenId, adminId:t.resolvioId, detalle:t.motivo||'Transferencia entre cajas', org:'Caja '+gxCajaNombre(t.cajaOrigenId), dst:'Caja '+gxCajaNombre(t.cajaDestinoId), conf:'alta', synthetic:true},'La transferencia aceptada tiene '+patas.length+' movimiento(s) en vez de 2: una caja quedó sin su salida o su entrada.');
+  });
+  // ---- eventos y cobros
+  const hoy2 = todayStr();
+  (state.eventos||[]).forEach(ev=>{
+    const precio = Number(ev.montoTotal)||0;
+    if(!(precio>0) || !ev.fecha || ev.estado==='posible' || ev.estado==='cancelado') return;
+    const cobrado = libro.filter(e=>e.eventoId===ev.id && e.signo>0 && e.nat!=='interno').reduce((a,x)=>a+x.monto,0);
+    const falta = precio-cobrado;
+    const sint = {key:'evento:'+ev.id, fuente:'evento', ref:ev.id, fecha:ev.fecha, signo:1, nat:'ingreso', cat:'ing_cobro', cajaId:null, adminId:null, detalle:(ev.lugar||'(sin lugar)')+' — precio '+fmt(precio)+', cobrado '+fmt(cobrado), org:'Cliente', dst:'', conf:'alta', synthetic:true};
+    if(ev.fecha<=hoy2 && falta>1) push('evento_sin_cobro', cobrado===0?'alta':'media', Object.assign({monto:falta},sint), cobrado===0 ? 'El evento ya pasó y no tiene ningún cobro registrado.' : 'El evento ya pasó y faltan '+fmt(falta)+' por cobrar.');
+    if(cobrado>precio*1.001+1) push('sobrecobro','media',Object.assign({monto:cobrado-precio},sint),'Se cobró '+fmt(cobrado-precio)+' más que el precio del evento. Revisá si el precio cambió o si hay un cobro repetido.');
+  });
+  (state.cajas||[]).forEach(c=>{
+    const x = gxExtractoCaja(libro, c.id);
+    if(x.min<0){ const e = x.rows.find(r=>r.saldo<0); if(e) push('caja_negativa','media',e.e,'La caja "'+c.nombre+'" llegó a quedar en negativo (mínimo Gs. '+x.min.toLocaleString('es-PY')+', el '+x.minFecha+').'); }
+  });
+  return rev;
+}
+const GX_REV_TITULOS = {
+  doble_registro:['Posible doble descuento','Gasto que coincide con un reembolso ya pagado al equipo.'],
+  posible_duplicado:['Posibles duplicados','Mismo día, monto y caja cargados como gasto y como compra.'],
+  caja_inexistente:['Movimientos sin caja','La caja ya no existe, entonces no suman a ningún saldo.'],
+  caja_negativa:['Cajas que quedaron en negativo','Señal de que algo se cargó tarde o falta un ingreso.'],
+  sin_detalle:['Sin detalle','No se sabe para qué fue el gasto.'],
+  sin_clasificar:['Sin clasificar','No hay forma de deducir qué fue. Elegí la categoría.'],
+  categoria_dudosa:['Categoría a confirmar','La categoría sugerida mezcla varias cosas o contradice la original.'],
+  pago_parcial:['Señas y pagos parciales','Pagos a cuenta de un trabajo o compra más grande.'],
+  empresa_de_evento:['Gastos de empresa que parecen de un evento','Asignarlos a un evento mejora el margen por evento.'],
+  sin_comprobante:['Egresos grandes sin comprobante','Desde ahora el formulario pide indicar si hay comprobante.'],
+  carga_tardia:['Cargados varios días después','Solo se puede detectar en movimientos cargados desde ahora.'],
+  fecha_futura:['Fecha futura','La fecha cargada es posterior a hoy.'],
+  evento_inexistente:['Evento eliminado','El evento ya no existe.'],
+  pago_duplicado:['Pagos al equipo repetidos','Misma persona, mismo día y mismo monto.'],
+  pago_atipico:['Pagos al equipo fuera de lo habitual','Mucho más que lo que suele cobrar esa persona.'],
+  pago_persona_eliminada:['Pagos a personas que ya no están','La persona fue eliminada del equipo.'],
+  pagos_sin_evento:['Pagos al equipo sin evento','Sin evento no se puede saber cuánto costó el personal de cada uno.'],
+  carga_caja_ajena:['Cargados en la caja de otro administrador','Conviene que lo confirme el dueño de la caja.'],
+  monto_atipico:['Montos fuera de lo habitual','Mucho más que lo normal en su categoría: puede ser un cero de más.'],
+  transferencia_incompleta:['Transferencias incompletas','Una caja tiene la salida pero la otra no tiene la entrada (o al revés).'],
+  evento_sin_cobro:['Eventos realizados con cobro pendiente','El evento ya pasó y no se cobró todo lo acordado.'],
+  sobrecobro:['Eventos cobrados de más','Se cobró más que el precio del evento.'],
+};
+const GX_REV_AREAS = {
+  pagos:['Pagos al equipo',['pago_duplicado','pago_atipico','pago_persona_eliminada','pagos_sin_evento']],
+  gastos:['Gastos y compras',['doble_registro','posible_duplicado','sin_detalle','sin_clasificar','categoria_dudosa','pago_parcial','empresa_de_evento','sin_comprobante','monto_atipico','carga_caja_ajena','carga_tardia','fecha_futura']],
+  cajas:['Cajas',['caja_inexistente','caja_negativa','transferencia_incompleta']],
+  eventos:['Eventos y cobros',['evento_sin_cobro','sobrecobro','evento_inexistente']],
+};
+function gxAreaDe(tipo){ for(const [a,[,t]] of Object.entries(GX_REV_AREAS)) if(t.includes(tipo)) return a; return 'gastos'; }
+function gxRevEstado(r){ return (state.revisados||{})[r.k] || null; }
+const GX_REV_ORDEN = ['doble_registro','posible_duplicado','pago_duplicado','transferencia_incompleta','caja_inexistente','evento_sin_cobro','sobrecobro','caja_negativa','sin_detalle','sin_clasificar','pago_persona_eliminada','pago_atipico','monto_atipico','categoria_dudosa','pago_parcial','carga_caja_ajena','empresa_de_evento','pagos_sin_evento','sin_comprobante','fecha_futura','evento_inexistente','carga_tardia'];
+
+// Control: lo que suman los movimientos tiene que coincidir con lo que dicen las cajas.
+function gxControlCajas(libro){
+  const porLibro = libro.filter(e=>e.cajaOk).reduce((s,e)=>s+e.signo*e.monto,0);
+  const ini = (state.cajas||[]).reduce((s,c)=>s+(Number(c.saldoInicial)||0),0);
+  const saldos = (state.cajas||[]).reduce((s,c)=>s+saldoCaja(c.id),0);
+  return {porLibro:ini+porLibro, saldos, diff: saldos-(ini+porLibro)};
+}
+function gxProveedoresSugeridos(){
+  const set = new Set(['Súper Más','Biggie','Casa Rica','Mercado de Abasto','Navegantes','Carpicenter','Plaza Hogar','Ferbasan','Ferrex','Los Jardines','Stock','Shell','Petrobras']);
+  (state.gastos||[]).concat(state.compras||[]).forEach(x=>{ if(x.proveedor) set.add(x.proveedor); });
+  (state.personal||[]).forEach(p=>{ if(p.nombre) set.add(p.nombre); });
+  return [...set].sort((a,b)=>a.localeCompare(b));
+}
+
+// ================= GASTOS E INVERSIONES — pantallas =================
+let gxVista = 'resumen';
+let gxF = {mes:'', caja:'', tipo:'', grupo:'', cat:'', evento:'', admin:'', texto:''};
+let gxLimite = 120;
+let gxRF = {area:'', sev:'', ver:'pendientes'};
+
+function gxBadgeRevisar(){ try{ const n = gxRevPendientes(gxRevisiones(gxLibro())); return n ? ' ('+n+')' : ''; }catch(e){ return ''; } }
+function gxMesLabel(m){ return m ? new Date(m+'-01T00:00:00').toLocaleDateString('es-PY',{month:'long', year:'numeric'}) : 'Todo el historial'; }
+function gxPct(a,b){ return b>0 ? Math.round(a/b*100) : 0; }
+function gxChip(g){ const x = GX_GRUPOS[g]||GX_GRUPOS.sin; return `<span class="gx-chip" style="--c:${x.color}">${x.label}</span>`; }
+function gxBar(p,color){ return `<div class="gx-bar"><i style="width:${Math.max(0,Math.min(100,p))}%;background:${color}"></i></div>`; }
+function gxSelect(key, valor, opciones, etiqueta){
+  return `<label class="gx-fl"><span>${etiqueta}</span><select data-gx-f="${key}">${opciones.map(([v,t])=>`<option value="${gxEsc(v)}" ${String(valor)===String(v)?'selected':''}>${gxEsc(t)}</option>`).join('')}</select></label>`;
+}
+function gxSelMes(libro){ return gxSelect('mes', gxF.mes, [['','Todo el historial']].concat(gxMeses(libro).map(m=>[m, gxMesLabel(m)])), 'Período'); }
+function gxEdicionBtn(e){ return ['prestamoAdmin','abonoPrestamoAdmin','resumen','transferencia'].includes(e.fuente) ? (e.fuente==='evento'?'':'') : (e.fuente==='evento' ? '<button class="btn small ghost" data-gx-evento="'+gxEsc(e.ref)+'">Ver evento</button>' : `<button class="btn small ghost" data-gx-edit="${gxEsc(e.key)}">Editar</button>`); }
+function gxSigno(e){ return (e.signo>0?'+':'-')+fmtMoney(e.monto); }
+function gxColorMonto(e){ return e.nat==='interno' ? 'var(--violet)' : (e.signo>0 ? 'var(--sage)' : 'var(--red)'); }
+function gxRevPendientes(rev){ return rev.filter(r=>r.sev!=='baja' && !gxRevEstado(r)).length; }
+
 function renderGastos(){
-  const rows = [...state.gastos].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
-  const totalEmpresa = sumaWhere(state.gastos, g=>g.tipo==='empresa' && g.movimiento!=='ingreso');
-  const totalEventos = sumaWhere(state.gastos, g=>g.tipo==='evento' && g.movimiento!=='ingreso');
-  const totalIngresosLibres = sumaWhere(state.gastos, g=>g.movimiento==='ingreso' && (!g.origenIngreso || g.origenIngreso==='libre'));
-  const totalIngresosInventario = sumaWhere(state.gastos, g=>g.movimiento==='ingreso' && (g.origenIngreso==='inventario' || g.origenIngreso==='premix'));
+  const libro = gxLibro();
+  const rev = gxRevisiones(libro);
+  const nrev = gxRevPendientes(rev);
+  const vistas = [['revisar','A revisar'+(nrev?' ('+nrev+')':'')],['resumen','Resumen'],['movimientos','Movimientos'],['categorias','Categorías'],['eventos','Eventos'],['cajas','Cajas'],['inversiones','Inversiones']];
+  if(!vistas.some(v=>v[0]===gxVista)) gxVista = 'resumen';
+  const vista = {resumen:gxVistaResumen, movimientos:gxVistaMovimientos, categorias:gxVistaCategorias, eventos:gxVistaEventos, cajas:gxVistaCajas, inversiones:gxVistaInversiones, revisar:gxVistaRevisar}[gxVista];
   return `
     <div class="row-between">
-      <div><h2 class="section-title">Gastos e Ingresos</h2><div class="section-hint">Gastos e inversiones de la empresa o de un evento, e ingresos — libres o por venta de ítems del inventario (alcohol, herramientas, pre-mix por litros, etc.) — cada uno afecta la caja que elijas.</div></div>
+      <div><h2 class="section-title">Gastos e Inversiones</h2><div class="section-hint">Todo lo que entra y sale, con de dónde vino, a dónde fue y para qué. Junta gastos, compras, pagos al equipo, cobros y transferencias en un solo lugar.</div></div>
       <button class="btn" id="btnNuevoGasto" ${state.cajas.length===0?'disabled title="Creá al menos una caja primero"':''}>+ Nuevo gasto / ingreso</button>
     </div>
-    <div class="grid-cards">
-      <div class="stat"><div class="k">Total gastos empresa</div><div class="v red">${fmtMoney(totalEmpresa)}</div></div>
-      <div class="stat"><div class="k">Total gastos por evento</div><div class="v red">${fmtMoney(totalEventos)}</div></div>
-      <div class="stat"><div class="k">Total ingresos libres</div><div class="v sage">${fmtMoney(totalIngresosLibres)}</div></div>
-      <div class="stat"><div class="k">Total ingresos por venta de inventario</div><div class="v sage">${fmtMoney(totalIngresosInventario)}</div></div>
-    </div>
-    ${state.cajas.length===0 ? '<div class="empty">Creá al menos una caja en la pestaña "Cajas" antes de cargar movimientos.</div>' : (rows.length===0 ? '<div class="empty">No hay gastos ni inversiones registrados.</div>' : `
-    <div class="card" style="padding:0; overflow-x:auto;">
-    <table>
-      <thead><tr><th>Fecha</th><th>Mov.</th><th>Tipo</th><th>Caja</th><th>Evento</th><th>Categoría</th><th>Descripción</th><th>Cargado por</th><th>Monto</th><th></th></tr></thead>
-      <tbody>
-      ${rows.map(g=>{ const ev = g.eventoId ? eventosDe(g.eventoId) : null; const caja = state.cajas.find(c=>c.id===g.cajaId); const adminC = state.admins.find(a=>a.id===g.adminId); return `
-        <tr>
-          <td>${fmtDate(g.fecha)}</td>
-          <td><span class="badge ${g.movimiento==='ingreso'?'reservado':'senado'}">${g.movimiento==='ingreso'?'Ingreso':'Egreso'}</span></td>
-          <td><span class="badge ${g.tipo==='empresa'?'senado':'posible'}">${g.tipo}</span></td>
-          <td>${caja?caja.nombre:'—'}</td>
-          <td>${ev?ev.lugar||'(sin lugar)':'—'}</td>
-          <td>${g.categoria||'—'}</td>
-          <td>${g.descripcion||'—'}</td>
-          <td style="color:var(--cream-dim);">${adminC?adminC.nombre:'—'}</td>
-          <td class="mono" style="color:${g.movimiento==='ingreso'?'var(--sage)':'var(--red)'}">${g.movimiento==='ingreso'?'+':'-'}${fmtMoney(g.monto)}</td>
-          <td><button class="btn small ghost" data-open-gasto="${g.id}">Editar</button></td>
-        </tr>
-      `;}).join('')}
-      </tbody>
-    </table>
-    </div>`)}
+    <nav class="tabs gx-tabs">${vistas.map(([k,t])=>`<button data-gx-vista="${k}" class="${gxVista===k?'active':''}">${t}</button>`).join('')}</nav>
+    ${state.cajas.length===0 ? '<div class="empty">Creá al menos una caja en la pestaña "Cajas" antes de cargar movimientos.</div>' : vista(libro, rev)}
   `;
 }
+
+// ---------- RESUMEN ----------
+function gxVistaResumen(libro, rev){
+  const lista = gxFiltrarPeriodo(libro, gxF.mes);
+  const t = gxTotales(lista);
+  const meses = gxMeses(libro);
+  const nrev = gxRevPendientes(rev);
+  const control = gxControlCajas(libro);
+  const grupos = Object.entries(t.porGrupo).sort((a,b)=>b[1]-a[1]);
+  const ingCats = Object.entries(t.ingPorCat).sort((a,b)=>b[1]-a[1]);
+  const catsDeGrupo = g=>Object.entries(t.porCat).filter(([c])=>GX_CATS[c].g===g).sort((a,b)=>b[1].total-a[1].total);
+  const kpi = (k,v,cls,sub)=>`<div class="stat"><div class="k">${k}</div><div class="v ${cls||''}">${fmtMoney(v)}</div>${sub?`<div class="section-hint" style="margin-top:2px;">${sub}</div>`:''}</div>`;
+  return `
+    <div class="gx-filtros">${gxSelMes(libro)}</div>
+    ${nrev>0 ? `<div class="card gx-aviso"><span><b>${nrev} cosas importantes para revisar</b> en lo cargado (posibles dobles descuentos, eventos sin cobrar, cajas en negativo, gastos sin detalle).</span><button class="btn small" data-gx-vista="revisar">Ver</button></div>` : ''}
+    <div class="grid-cards gx-kpis">
+      ${kpi('Ingresos', t.ing, 'sage', 'Cobros de eventos y ventas')}
+      ${kpi('Gastos de operación', t.gasto, 'red', gxPct(t.gasto,t.ing)+'% de lo que ingresó')}
+      ${kpi('Personal y comisiones', t.personal, 'red', gxPct(t.personal,t.ing)+'% de lo que ingresó')}
+      ${kpi('Resultado operativo', t.resultadoOperativo, t.resultadoOperativo>=0?'sage':'red', 'Ingresos menos operación y personal')}
+      ${kpi('Inversiones', t.inversion, '', 'Barra, mobiliario y equipamiento')}
+      ${kpi('Neto de caja', t.neto, t.neto>=0?'sage':'red', 'Después de invertir')}
+    </div>
+    <div class="gx-dos">
+      <div class="card">
+        <h3 class="gx-h">De dónde vino la plata</h3>
+        ${ingCats.length===0 ? '<div class="section-hint">Sin ingresos en este período.</div>' : ingCats.map(([c,v])=>`
+          <div class="gx-fila"><div class="gx-fila-top"><span>${gxEsc(GX_CATS[c].label)}</span><span class="mono">${fmtMoney(v)}</span></div>${gxBar(gxPct(v,t.ing), GX_GRUPOS.ing.color)}</div>`).join('')}
+      </div>
+      <div class="card">
+        <h3 class="gx-h">A dónde fue</h3>
+        ${grupos.length===0 ? '<div class="section-hint">Sin egresos en este período.</div>' : grupos.map(([g,v])=>`
+          <details class="gx-det"><summary>
+            <div class="gx-fila"><div class="gx-fila-top"><span>${gxChip(g)}</span><span class="mono">${fmtMoney(v)} <small style="color:var(--cream-dim);">· ${gxPct(v,t.egresos)}%</small></span></div>${gxBar(gxPct(v,t.egresos), GX_GRUPOS[g].color)}</div>
+          </summary>
+          <div class="gx-sub">${catsDeGrupo(g).map(([c,x])=>`<div class="gx-subfila"><a href="javascript:void(0)" data-gx-goto="cat:${c}">${gxEsc(GX_CATS[c].label)}</a><span class="mono">${fmtMoney(x.total)} <small>(${x.n})</small></span></div>`).join('')}</div></details>`).join('')}
+        <div class="section-hint" style="margin-top:10px;">Hay ${fmtMoney(t.internoOut)} en transferencias entre cajas y préstamos entre socios que no cuentan como gasto ni como ingreso.</div>
+      </div>
+    </div>
+    <div class="card" style="padding:0; overflow-x:auto; margin-top:16px;">
+      <table>
+        <thead><tr><th>Mes</th><th style="text-align:right;">Ingresos</th><th style="text-align:right;">Operación</th><th style="text-align:right;">Personal</th><th style="text-align:right;">Resultado operativo</th><th style="text-align:right;">Inversiones</th><th style="text-align:right;">Neto de caja</th></tr></thead>
+        <tbody>${meses.map(m=>{ const x = gxTotales(gxFiltrarPeriodo(libro,m)); return `
+          <tr><td>${gxMesLabel(m)}</td><td class="mono" style="text-align:right;color:var(--sage);">${fmtMoney(x.ing)}</td><td class="mono" style="text-align:right;">${fmtMoney(x.gasto)}</td><td class="mono" style="text-align:right;">${fmtMoney(x.personal)}</td>
+          <td class="mono" style="text-align:right;color:${x.resultadoOperativo>=0?'var(--sage)':'var(--red)'};">${fmtMoney(x.resultadoOperativo)}</td><td class="mono" style="text-align:right;">${fmtMoney(x.inversion)}</td>
+          <td class="mono" style="text-align:right;color:${x.neto>=0?'var(--sage)':'var(--red)'};">${fmtMoney(x.neto)}</td></tr>`; }).join('')}</tbody>
+      </table>
+    </div>
+    <div class="section-hint" style="margin-top:10px;">
+      ${control.diff===0 ? `<span style="color:var(--sage);">✔ Control:</span> los movimientos suman ${fmtMoney(control.porLibro)}, igual que el saldo de todas las cajas.` : `<span style="color:var(--red);">✖ Control:</span> los movimientos suman ${fmtMoney(control.porLibro)} y las cajas ${fmtMoney(control.saldos)} (diferencia ${fmtMoney(control.diff)}). Revisá "Por revisar".`}
+    </div>`;
+}
+
+// ---------- MOVIMIENTOS ----------
+function gxAplicarFiltros(libro){
+  let l = gxF.caja ? libro.slice() : libro.filter(e=>!e.oculto);
+  if(gxF.mes) l = l.filter(e=>gxMes(e.fecha)===gxF.mes);
+  if(gxF.caja) l = l.filter(e=>e.cajaId===gxF.caja);
+  if(gxF.tipo==='ingreso') l = l.filter(e=>e.nat==='ingreso');
+  else if(gxF.tipo==='gasto') l = l.filter(e=>e.nat==='gasto');
+  else if(gxF.tipo==='inversion') l = l.filter(e=>e.nat==='inversion');
+  else if(gxF.tipo==='interno') l = l.filter(e=>e.nat==='interno');
+  if(gxF.grupo) l = l.filter(e=>e.grupo===gxF.grupo);
+  if(gxF.cat) l = l.filter(e=>e.cat===gxF.cat);
+  if(gxF.evento==='_empresa') l = l.filter(e=>!e.eventoId && e.nat!=='interno');
+  else if(gxF.evento) l = l.filter(e=>e.eventoId===gxF.evento);
+  if(gxF.admin) l = l.filter(e=>e.adminId===gxF.admin);
+  if(gxF.texto){ const q = gxNorm(gxF.texto); l = l.filter(e=>gxNorm([e.detalle,e.catOriginal,e.proveedor,e.org,e.dst,gxCatInfo(e.cat).label,String(e.monto)].join(' ')).includes(q)); }
+  return l.sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||'') || (b.ts-a.ts));
+}
+function gxVistaMovimientos(libro){
+  const lista = gxAplicarFiltros(libro);
+  const t = gxTotales(lista.filter(e=>!e.oculto));
+  const eventos = [...state.eventos].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const grupoOpts = [['','Todos']].concat(Object.entries(GX_GRUPOS).map(([k,v])=>[k,v.label]));
+  const catOpts = [['','Todas']].concat(Object.entries(GX_CATS).filter(([id,c])=>!gxF.grupo || c.g===gxF.grupo).map(([id,c])=>[id,c.label]));
+  const visibles = lista.slice(0, gxLimite);
+  return `
+    <div class="gx-filtros">
+      ${gxSelMes(libro)}
+      ${gxSelect('caja', gxF.caja, [['','Todas']].concat(state.cajas.map(c=>[c.id,c.nombre])), 'Caja')}
+      ${gxSelect('tipo', gxF.tipo, [['','Todos'],['ingreso','Ingresos'],['gasto','Gastos'],['inversion','Inversiones'],['interno','Internos']], 'Tipo')}
+      ${gxSelect('grupo', gxF.grupo, grupoOpts, 'Grupo')}
+      ${gxSelect('cat', gxF.cat, catOpts, 'Categoría')}
+      ${gxSelect('evento', gxF.evento, [['','Todos'],['_empresa','Solo empresa']].concat(eventos.map(e=>[e.id,(e.lugar||'(sin lugar)')+' — '+fmtDate(e.fecha)])), 'Evento')}
+      ${gxSelect('admin', gxF.admin, [['','Todos']].concat(state.admins.map(a=>[a.id,a.nombre])), 'Cargó')}
+      <label class="gx-fl"><span>Buscar</span><input type="text" id="gxTexto" data-gx-f="texto" value="${gxEsc(gxF.texto)}" placeholder="proveedor, detalle, monto…"></label>
+    </div>
+    <div class="gx-resumen-linea">
+      <span><b>${lista.length}</b> movimientos</span>
+      <span style="color:var(--sage);">Ingresos ${fmtMoney(t.ing)}</span>
+      <span style="color:var(--red);">Egresos ${fmtMoney(t.egresos)}</span>
+      <span>Neto <b style="color:${t.neto>=0?'var(--sage)':'var(--red)'};">${fmtMoney(t.neto)}</b></span>
+      <span style="flex:1;"></span>
+      <button class="btn small ghost" data-gx-limpiar>Limpiar filtros</button>
+      <button class="btn small ghost" data-gx-csv>Descargar para Excel</button>
+    </div>
+    ${lista.length===0 ? '<div class="empty">No hay movimientos con esos filtros.</div>' : `
+    <div class="card" style="padding:0; overflow-x:auto;">
+    <table class="gx-tabla">
+      <thead><tr><th>Fecha</th><th>De dónde → a dónde</th><th>Para</th><th>Categoría</th><th>Detalle</th><th>Cargó</th><th style="text-align:right;">Monto</th><th></th></tr></thead>
+      <tbody>${visibles.map(e=>{
+        const cat = gxCatInfo(e.cat);
+        const sugerida = e.conf!=='manual' && e.conf!=='alta' && e.nat!=='interno';
+        return `<tr>
+          <td style="white-space:nowrap;">${fmtDate(e.fecha)}</td>
+          <td><div class="gx-flujo"><span>${gxEsc(e.org)}</span><span class="gx-flecha">→</span><span>${e.dst ? gxEsc(e.dst) : '<i style="color:var(--cream-dim);">sin destino cargado</i>'}</span></div></td>
+          <td>${e.nat==='interno' ? '<span style="color:var(--cream-dim);">—</span>' : (e.eventoId ? gxEsc(gxEventoNombre(e.eventoId)) : '<span style="color:var(--cream-dim);">Empresa</span>')}</td>
+          <td>${gxChip(cat.g)}<div class="gx-cat">${gxEsc(cat.label)}${sugerida?` <span class="gx-sug" title="${gxEsc(e.nota||'Categoría deducida automáticamente')}">sugerida</span>`:''}</div></td>
+          <td class="gx-det-td">${gxEsc(e.detalle||e.catOriginal||'—')}${e.comprobante==='si'?' <span title="Con comprobante" style="color:var(--sage);">●</span>':''}</td>
+          <td style="color:var(--cream-dim);">${gxEsc(gxAdminNombre(e.adminId))}</td>
+          <td class="mono" style="text-align:right;color:${gxColorMonto(e)};white-space:nowrap;">${gxSigno(e)}</td>
+          <td>${gxEdicionBtn(e)}</td></tr>`; }).join('')}</tbody>
+    </table></div>
+    ${lista.length>visibles.length ? `<div style="text-align:center;margin-top:12px;"><button class="btn ghost" data-gx-mas>Mostrar más (${lista.length-visibles.length} restantes)</button></div>` : ''}`}
+  `;
+}
+function gxExportarCSV(lista){
+  const q = v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const cols = ['Fecha','Movimiento','De','A','Para','Grupo','Categoría','Detalle','Cargó','Caja','Comprobante','Monto'];
+  const rows = lista.map(e=>[e.fecha, e.nat==='interno'?'Interno':(e.signo>0?'Ingreso':(e.nat==='inversion'?'Inversión':'Gasto')), e.org, e.dst||'', e.nat==='interno'?'':(e.eventoId?gxEventoNombre(e.eventoId):'Empresa'),
+    GX_GRUPOS[e.grupo].label, gxCatInfo(e.cat).label, e.detalle||e.catOriginal, gxAdminNombre(e.adminId), gxCajaNombre(e.cajaId), e.comprobante==='si'?'Sí':(e.comprobante==='no'?'No':''), e.signo*e.monto]);
+  const csv = '﻿'+[cols].concat(rows).map(r=>r.map(q).join(';')).join('\r\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = 'blend-movimientos-'+todayStr()+'.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+// ---------- CATEGORÍAS ----------
+function gxVistaCategorias(libro){
+  const lista = gxFiltrarPeriodo(libro, gxF.mes).filter(e=>!e.oculto);
+  const t = gxTotales(lista);
+  const orden = ['ins','evt','per','cli','emp','inv','sin'];
+  const filasGrupo = orden.filter(g=>t.porGrupo[g]).map(g=>{
+    const cats = Object.entries(t.porCat).filter(([c])=>GX_CATS[c].g===g).sort((a,b)=>b[1].total-a[1].total);
+    return `<tr class="gx-grupo-fila"><td>${gxChip(g)}</td><td class="mono" style="text-align:right;">${cats.reduce((s,[,x])=>s+x.n,0)}</td><td class="mono" style="text-align:right;"><b>${fmtMoney(t.porGrupo[g])}</b></td><td class="mono" style="text-align:right;">${gxPct(t.porGrupo[g],t.egresos)}%</td><td></td><td><button class="btn small ghost" data-gx-goto="grupo:${g}">Ver</button></td></tr>`
+      + cats.map(([c,x])=>`<tr><td style="padding-left:28px;">${gxEsc(GX_CATS[c].label)}</td><td class="mono" style="text-align:right;">${x.n}</td><td class="mono" style="text-align:right;">${fmtMoney(x.total)}</td><td class="mono" style="text-align:right;">${gxPct(x.total,t.egresos)}%</td><td class="mono" style="text-align:right;color:var(--cream-dim);">${fmtMoney(Math.round(x.total/x.n))}</td><td><button class="btn small ghost" data-gx-goto="cat:${c}">Ver</button></td></tr>`).join('');
+  }).join('');
+  // a quién se le pagó
+  const dest = {}; let sinDest = {n:0,total:0};
+  lista.filter(e=>e.signo<0 && e.nat!=='interno' && e.fuente!=='pago').forEach(e=>{
+    if(e.dst){ const k = e.dst.trim(); dest[k] = dest[k]||{n:0,total:0}; dest[k].n++; dest[k].total += e.monto; } else { sinDest.n++; sinDest.total += e.monto; }
+  });
+  const personas = {};
+  lista.filter(e=>e.fuente==='pago').forEach(e=>{ const k = e.proveedor||'(persona eliminada)'; personas[k] = personas[k]||{n:0,total:0}; personas[k].n++; personas[k].total += e.monto; });
+  const topDest = Object.entries(dest).sort((a,b)=>b[1].total-a[1].total).slice(0,15);
+  const topPers = Object.entries(personas).sort((a,b)=>b[1].total-a[1].total);
+  const totEgrProveedor = t.gasto + t.inversion;
+  return `
+    <div class="gx-filtros">${gxSelMes(libro)}</div>
+    <div class="card" style="padding:0; overflow-x:auto;">
+      <table><thead><tr><th>Categoría</th><th style="text-align:right;">Mov.</th><th style="text-align:right;">Total</th><th style="text-align:right;">% de egresos</th><th style="text-align:right;">Promedio</th><th></th></tr></thead>
+      <tbody>${filasGrupo || '<tr><td colspan="6"><div class="empty">Sin egresos en este período.</div></td></tr>'}</tbody></table>
+    </div>
+    <div class="gx-dos" style="margin-top:16px;">
+      <div class="card"><h3 class="gx-h">A quién se le pagó (proveedores)</h3>
+        ${topDest.map(([k,x])=>`<div class="gx-subfila"><span>${gxEsc(k)}</span><span class="mono">${fmtMoney(x.total)} <small>(${x.n})</small></span></div>`).join('')}
+        <div class="gx-subfila" style="margin-top:6px;"><span style="color:var(--cream-dim);"><i>Sin proveedor cargado</i></span><span class="mono">${fmtMoney(sinDest.total)} <small>(${sinDest.n})</small></span></div>
+        <div class="section-hint" style="margin-top:8px;">Desde ahora el formulario pide a quién se le pagó. Con el tiempo esta lista deja de tener "sin proveedor" (${gxPct(sinDest.total, Math.max(1,totEgrProveedor))}% hoy).</div>
+      </div>
+      <div class="card"><h3 class="gx-h">Pagos al equipo</h3>
+        ${topPers.length===0 ? '<div class="section-hint">Sin pagos en este período.</div>' : topPers.map(([k,x])=>`<div class="gx-subfila"><span>${gxEsc(k)}</span><span class="mono">${fmtMoney(x.total)} <small>(${x.n})</small></span></div>`).join('')}
+        <div class="section-hint" style="margin-top:8px;">Incluye reembolsos de gastos que el equipo adelantó (fletes, compras).</div>
+      </div>
+    </div>`;
+}
+
+// ---------- EVENTOS ----------
+function gxVistaEventos(libro){
+  const hoy = todayStr();
+  const porEv = {};
+  libro.filter(e=>e.eventoId && e.nat!=='interno').forEach(e=>{ (porEv[e.eventoId] = porEv[e.eventoId]||[]).push(e); });
+  const evs = state.eventos.filter(ev=>porEv[ev.id] || (ev.estado==='reservado' && ev.fecha && ev.fecha<=hoy)).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const pagosConEvento = (state.pagos||[]).filter(p=>p.eventoId).length;
+  const filas = evs.map(ev=>{
+    const movs = (porEv[ev.id]||[]);
+    const cobrado = movs.filter(e=>e.signo>0).reduce((s,e)=>s+e.monto,0);
+    const gastos = movs.filter(e=>e.signo<0).reduce((s,e)=>s+e.monto,0);
+    const precio = Number(ev.montoTotal)||0;
+    const margen = cobrado - gastos;
+    const falta = Math.max(0, precio - cobrado);
+    const pasado = ev.fecha && ev.fecha<=hoy;
+    return `<details class="gx-evento"><summary>
+      <div class="gx-ev-fila">
+        <div class="gx-ev-nombre"><b>${gxEsc(ev.lugar||'(sin lugar)')}</b><small>${fmtDate(ev.fecha)} · ${gxEsc(ev.estado||'')}</small></div>
+        <div class="gx-ev-num"><small>Precio</small><span class="mono">${fmtMoney(precio)}</span></div>
+        <div class="gx-ev-num"><small>Cobrado</small><span class="mono" style="color:var(--sage);">${fmtMoney(cobrado)}</span></div>
+        <div class="gx-ev-num"><small>Gastos directos</small><span class="mono" style="color:var(--red);">${fmtMoney(gastos)}</span></div>
+        <div class="gx-ev-num"><small>Margen parcial</small><span class="mono" style="color:${margen>=0?'var(--sage)':'var(--red)'};">${fmtMoney(margen)}</span></div>
+        <div class="gx-ev-est">${falta>0 && pasado ? `<span class="gx-alerta">Falta cobrar ${fmtMoney(falta)}</span>` : (precio>0 && falta===0 ? '<span class="gx-ok">Cobrado completo</span>' : '')}</div>
+      </div></summary>
+      <div class="gx-sub">${movs.length===0 ? '<div class="section-hint">Este evento no tiene ningún movimiento cargado.</div>' : movs.sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||'')).map(e=>`
+        <div class="gx-subfila"><span>${fmtDate(e.fecha)} · ${gxEsc(gxCatInfo(e.cat).label)} · ${gxEsc(e.detalle||e.org)}</span><span class="mono" style="color:${gxColorMonto(e)};">${gxSigno(e)}</span></div>`).join('')}</div></details>`;
+  }).join('');
+  const sinEvento = libro.filter(e=>!e.eventoId && e.nat!=='interno' && !e.oculto);
+  const tEmp = gxTotales(sinEvento);
+  return `
+    <div class="section-hint" style="margin-bottom:12px;">Cada evento con lo que se cobró y lo que se gastó directamente en él. El margen es <b>parcial</b>: ${pagosConEvento===0?'ningún pago al equipo tiene un evento asignado, por eso el costo del personal no aparece acá.':'solo cuenta los pagos al equipo que tienen evento asignado.'} Para que sea más completo, elegí el evento al cargar gastos, compras y pagos.</div>
+    ${filas || '<div class="empty">Todavía no hay eventos con movimientos.</div>'}
+    <div class="card" style="margin-top:14px;">
+      <div class="gx-fila-top"><b>Empresa (sin evento)</b><span class="mono">Gastos ${fmtMoney(tEmp.gasto + tEmp.personal)} · Inversiones ${fmtMoney(tEmp.inversion)} · Ingresos ${fmtMoney(tEmp.ing)}</span></div>
+      <div class="section-hint">Lo que no está asignado a ningún evento: alquiler, contador, inversiones, ventas de inventario y gastos generales.</div>
+      <button class="btn small ghost" style="margin-top:8px;" data-gx-goto="evento:_empresa">Ver estos movimientos</button>
+    </div>`;
+}
+
+// ---------- CAJAS ----------
+function gxVistaCajas(libro){
+  const control = gxControlCajas(libro);
+  const bloques = state.cajas.map(c=>{
+    const x = gxExtractoCaja(libro, c.id);
+    const ing = x.rows.filter(r=>r.e.signo>0 && r.e.nat!=='interno').reduce((s,r)=>s+r.e.monto,0);
+    const egr = x.rows.filter(r=>r.e.signo<0 && r.e.nat!=='interno').reduce((s,r)=>s+r.e.monto,0);
+    const tin = x.rows.filter(r=>r.e.nat==='interno' && r.e.signo>0).reduce((s,r)=>s+r.e.monto,0);
+    const tout = x.rows.filter(r=>r.e.nat==='interno' && r.e.signo<0).reduce((s,r)=>s+r.e.monto,0);
+    const dueno = c.administradorId ? gxAdminNombre(c.administradorId) : 'sin dueño';
+    const coincide = x.final === saldoCaja(c.id);
+    return `<div class="card" style="margin-bottom:14px;">
+      <div class="row-between" style="margin-bottom:10px;"><div><h3 class="gx-h" style="margin:0;">${gxEsc(c.nombre)}</h3><div class="section-hint">Caja de ${gxEsc(dueno)}${c.tipo?' · '+gxEsc(c.tipo):''}</div></div>
+        <div style="text-align:right;"><div class="section-hint">Saldo actual</div><div class="mono" style="font-size:1.4rem;color:${x.final>=0?'var(--sage)':'var(--red)'};">${fmtMoney(x.final)}</div></div></div>
+      <div class="gx-cuenta">
+        <div><small>Saldo inicial</small><span class="mono">${fmtMoney(x.ini)}</span></div>
+        <div><small>+ Ingresos</small><span class="mono" style="color:var(--sage);">${fmtMoney(ing)}</span></div>
+        <div><small>− Egresos</small><span class="mono" style="color:var(--red);">${fmtMoney(egr)}</span></div>
+        <div><small>± Transferencias y préstamos</small><span class="mono" style="color:var(--violet);">${fmtMoney(tin-tout)}</span></div>
+      </div>
+      ${x.min<0 ? `<div class="gx-alerta" style="margin:10px 0;">Llegó a quedar en negativo: mínimo ${fmtMoney(x.min)} el ${fmtDate(x.minFecha)}.</div>` : ''}
+      ${coincide ? '' : '<div class="gx-alerta" style="margin:10px 0;">El extracto no coincide con el saldo de la caja. Revisá "Por revisar".</div>'}
+      <details class="gx-det"><summary class="btn small ghost" style="display:inline-block;margin-top:8px;">Ver extracto con saldo corrido (${x.rows.length})</summary>
+        <div style="overflow-x:auto;margin-top:10px;"><table class="gx-tabla"><thead><tr><th>Fecha</th><th>Movimiento</th><th style="text-align:right;">Monto</th><th style="text-align:right;">Saldo</th></tr></thead>
+        <tbody><tr><td colspan="3" style="color:var(--cream-dim);">Saldo inicial</td><td class="mono" style="text-align:right;">${fmtMoney(x.ini)}</td></tr>
+        ${x.rows.map(({e,saldo})=>`<tr><td style="white-space:nowrap;">${fmtDate(e.fecha)}</td><td><div class="gx-flujo"><span>${gxEsc(e.org)}</span><span class="gx-flecha">→</span><span>${gxEsc(e.dst||gxCatInfo(e.cat).label)}</span></div><div class="section-hint">${gxEsc(e.detalle||e.catOriginal||'')}</div></td>
+          <td class="mono" style="text-align:right;color:${gxColorMonto(e)};white-space:nowrap;">${gxSigno(e)}</td><td class="mono" style="text-align:right;color:${saldo<0?'var(--red)':'inherit'};">${fmtMoney(saldo)}</td></tr>`).join('')}</tbody></table></div>
+        <div class="section-hint" style="margin-top:6px;">Dentro de un mismo día el orden es aproximado: se usa la hora en que se cargó cuando está disponible.</div>
+      </details>
+    </div>`;
+  }).join('');
+  return `
+    <div class="section-hint" style="margin-bottom:12px;">Cada caja con todo lo que entró y salió de ella, y cómo fue cambiando su saldo. ${control.diff===0?'<span style="color:var(--sage);">✔ Coincide con el saldo de las cajas.</span>':'<span style="color:var(--red);">✖ No coincide con el saldo de las cajas.</span>'}</div>
+    ${bloques}`;
+}
+
+// ---------- INVERSIONES ----------
+function gxVistaInversiones(libro){
+  const inv = libro.filter(e=>e.nat==='inversion' && e.signo<0).sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const total = inv.reduce((s,e)=>s+e.monto,0);
+  const porCat = {}; inv.forEach(e=>{ porCat[e.cat] = (porCat[e.cat]||0)+e.monto; });
+  const parciales = inv.map(e=>({e, c:gxCompromiso(e)})).filter(x=>x.c);
+  const falta = parciales.reduce((s,x)=>s+Math.max(0,x.c.total-x.e.monto),0);
+  const porMes = {}; inv.forEach(e=>{ const m = gxMes(e.fecha); porMes[m] = (porMes[m]||0)+e.monto; });
+  return `
+    <div class="grid-cards">
+      <div class="stat featured"><div class="k">Total invertido</div><div class="v">${fmtMoney(total)}</div><div class="section-hint" style="margin-top:2px;">${inv.length} compras</div></div>
+      ${Object.entries(porCat).sort((a,b)=>b[1]-a[1]).map(([c,v])=>`<div class="stat"><div class="k">${gxEsc(GX_CATS[c].label)}</div><div class="v">${fmtMoney(v)}</div></div>`).join('')}
+      <div class="stat"><div class="k">Falta pagar de señas</div><div class="v red">${fmtMoney(falta)}</div><div class="section-hint" style="margin-top:2px;">${parciales.length} pagos parciales</div></div>
+    </div>
+    <div class="section-hint" style="margin:-6px 0 12px;">Una inversión es algo que queda en el negocio (barra, estantes, equipamiento). Para saber cuánto falta pagar de una seña, cargá el "monto total acordado" al registrar el gasto.</div>
+    ${inv.length===0 ? '<div class="empty">Todavía no hay inversiones registradas.</div>' : `
+    <div class="card" style="padding:0; overflow-x:auto;"><table class="gx-tabla">
+      <thead><tr><th>Fecha</th><th>Qué se compró</th><th>Categoría</th><th>Caja</th><th style="text-align:right;">Pagado</th><th style="text-align:right;">Acordado</th><th style="text-align:right;">Falta</th><th></th></tr></thead>
+      <tbody>${inv.map(e=>{ const c = gxCompromiso(e); const f = c ? Math.max(0,c.total-e.monto) : 0; return `<tr>
+        <td style="white-space:nowrap;">${fmtDate(e.fecha)}</td><td>${gxEsc(e.detalle||e.catOriginal||'—')}${e.dst?`<div class="section-hint">${gxEsc(e.dst)}</div>`:''}</td>
+        <td>${gxEsc(gxCatInfo(e.cat).label)}</td><td>${gxEsc(gxCajaNombre(e.cajaId))}</td>
+        <td class="mono" style="text-align:right;">${fmtMoney(e.monto)}</td>
+        <td class="mono" style="text-align:right;">${c?fmtMoney(c.total)+(c.estimado?'<div class="section-hint">estimado</div>':''):'—'}</td>
+        <td class="mono" style="text-align:right;color:${f>0?'var(--red)':'inherit'};">${c?fmtMoney(f):'—'}</td>
+        <td>${gxEdicionBtn(e)}</td></tr>`; }).join('')}</tbody></table></div>`}
+    <div class="card" style="margin-top:14px;"><h3 class="gx-h">Inversión por mes</h3>
+      ${Object.entries(porMes).sort((a,b)=>b[0].localeCompare(a[0])).map(([m,v])=>`<div class="gx-fila"><div class="gx-fila-top"><span>${gxMesLabel(m)}</span><span class="mono">${fmtMoney(v)}</span></div>${gxBar(gxPct(v,total), GX_GRUPOS.inv.color)}</div>`).join('')}
+    </div>`;
+}
+
+// ---------- A REVISAR ----------
+const GX_SEV = {alta:['Importante','var(--red)'], media:['Revisar','var(--gold)'], baja:['Menor','var(--cream-dim)']};
+function gxVistaRevisar(libro, rev){
+  const pend = rev.filter(r=>!gxRevEstado(r));
+  const hechos = rev.filter(r=>gxRevEstado(r));
+  const base = gxRF.ver==='revisados' ? hechos : pend;
+  const lista = base.filter(r=>(!gxRF.area || gxAreaDe(r.tipo)===gxRF.area) && (!gxRF.sev || r.sev===gxRF.sev));
+  const suma = l=>l.filter(r=>!r.e.synthetic || r.e.fuente==='evento').reduce((a,r)=>a+(r.e.monto||0),0);
+  const cnt = sv=>pend.filter(r=>r.sev===sv).length;
+  const seguras = libro.filter(e=>(e.fuente==='gasto'||e.fuente==='compra') && !e.obj.cat && e.conf==='alta' && e.nat!=='interno' && !e.oculto).length;
+  const grupos = GX_REV_ORDEN.map(t=>[t, lista.filter(r=>r.tipo===t)]).filter(([,l])=>l.length);
+  const chipArea = (k,t,n)=>`<button class="gx-pill ${gxRF.area===k?'on':''}" data-gx-rf="area:${k}">${t}${n!=null?` <b>${n}</b>`:''}</button>`;
+  const chipSev = (k,t)=>`<button class="gx-pill ${gxRF.sev===k?'on':''}" data-gx-rf="sev:${k}"><span style="color:${GX_SEV[k][1]};">●</span> ${t}</button>`;
+  const opcionesCat = e=>gxOpcionesCat(e.signo>0?'ingreso':'egreso', e.cat);
+  return `
+    <div class="grid-cards">
+      <div class="stat"><div class="k">Importantes</div><div class="v red">${cnt('alta')}</div><div class="section-hint">Pueden cambiar saldos o cobros</div></div>
+      <div class="stat"><div class="k">Para revisar</div><div class="v" style="color:var(--gold);">${cnt('media')}</div><div class="section-hint">Conviene confirmar</div></div>
+      <div class="stat"><div class="k">Menores</div><div class="v">${cnt('baja')}</div><div class="section-hint">Orden y prolijidad</div></div>
+      <div class="stat"><div class="k">Ya revisados</div><div class="v sage">${hechos.length}</div><div class="section-hint">Marcados por ustedes</div></div>
+    </div>
+    <div class="card gx-aviso">
+      <span>Son <b>pistas</b> para mirar con el comprobante en la mano, no errores confirmados. Marcar algo como revisado o cambiar una categoría <b>no modifica ningún monto ni saldo</b>.</span>
+      ${seguras>0 ? `<button class="btn small" data-gx-aceptar>Confirmar ${seguras} categorías seguras</button>` : ''}
+    </div>
+    <div class="gx-pills">
+      ${chipArea('', 'Todo', base.length)}
+      ${Object.entries(GX_REV_AREAS).map(([k,[t]])=>chipArea(k,t,base.filter(r=>gxAreaDe(r.tipo)===k).length)).join('')}
+      <span style="width:12px;"></span>
+      ${chipSev('alta','Importantes')}${chipSev('media','Para revisar')}${chipSev('baja','Menores')}
+      <span style="flex:1;"></span>
+      <button class="gx-pill ${gxRF.ver==='revisados'?'on':''}" data-gx-rf="ver:${gxRF.ver==='revisados'?'pendientes':'revisados'}">${gxRF.ver==='revisados'?'← Volver a pendientes':'Ver revisados ('+hechos.length+')'}</button>
+    </div>
+    ${grupos.length===0 ? `<div class="empty">${gxRF.ver==='revisados'?'Todavía no marcaste nada como revisado.':'No hay nada para revisar con estos filtros. 🎉'}</div>` : grupos.map(([t,l])=>{
+      const sevTipo = l[0].sev;
+      const abierto = sevTipo==='alta' || sevTipo==='media';
+      return `
+      <details class="card gx-rev" ${abierto?'open':''}>
+        <summary><span style="color:${GX_SEV[sevTipo][1]};">●</span> <b>${GX_REV_TITULOS[t][0]}</b> <span class="gx-count">${l.length}</span> <span class="gx-count">${GX_SEV[sevTipo][0]}</span><div class="section-hint">${GX_REV_TITULOS[t][1]}</div></summary>
+        <div style="overflow-x:auto;margin-top:8px;"><table class="gx-tabla"><tbody>${l.map(r=>{ const e = r.e; const est = gxRevEstado(r); const puedeCat = !est && (t==='sin_clasificar'||t==='categoria_dudosa') && (e.fuente==='gasto'||e.fuente==='compra'); return `<tr>
+          <td style="white-space:nowrap;">${e.fecha?fmtDate(e.fecha):'—'}</td>
+          <td>${gxEsc(e.detalle||e.catOriginal||'(sin detalle)')}<div class="section-hint">${gxEsc(r.msg)}</div>${est?`<div class="section-hint" style="color:var(--sage);">✔ Revisado por ${gxEsc(est.por||'—')} el ${new Date(est.ts).toLocaleDateString('es-PY')}${est.nota?' — '+gxEsc(est.nota):''}</div>`:''}</td>
+          <td style="color:var(--cream-dim);">${e.cajaId?gxEsc(gxCajaNombre(e.cajaId)):''}${e.adminId?'<br>'+gxEsc(gxAdminNombre(e.adminId)):''}</td>
+          <td class="mono" style="text-align:right;color:${gxColorMonto(e)};white-space:nowrap;">${e.monto?gxSigno(e):''}</td>
+          <td style="min-width:210px;">${puedeCat ? `<select data-gx-setcat="${gxEsc(e.key)}" style="max-width:190px;">${t==='categoria_dudosa'?`<option value="${e.cat}">✔ Dejar "${gxEsc(gxCatInfo(e.cat).label)}"</option>`:'<option value="">Elegir categoría…</option>'}${opcionesCat(e).replace('<option value="">— Elegí una categoría —</option>','')}</select>` : ''}
+            ${gxEdicionBtn(e)}
+            ${est ? `<button class="btn small ghost" data-gx-reabrir="${gxEsc(r.k)}">Reabrir</button>` : `<button class="btn small ghost" data-gx-ok="${gxEsc(r.k)}">✓ Revisado</button>`}</td></tr>`; }).join('')}</tbody></table></div>
+      </details>`; }).join('')}
+  `;
+}
+
+// ---------- formulario: categoría, proveedor y comprobante ----------
+function gxOpcionesCat(mov, sel){
+  const grupos = mov==='ingreso' ? ['ing'] : ['ins','evt','per','cli','emp','inv'];
+  const permitido = id=> mov==='ingreso' ? (id==='ing_venta'||id==='ing_otro') : id!=='per_pago';
+  let h = '<option value="">— Elegí una categoría —</option>';
+  grupos.forEach(g=>{
+    const items = Object.entries(GX_CATS).filter(([id,c])=>c.g===g && permitido(id));
+    if(items.length) h += `<optgroup label="${gxEsc(GX_GRUPOS[g].label)}">${items.map(([id,c])=>`<option value="${id}" ${sel===id?'selected':''}>${gxEsc(c.label)}</option>`).join('')}</optgroup>`;
+  });
+  return h;
+}
+function gxCamposTraza(o, mov, conCompromiso){
+  o = o || {};
+  const sel = o.id ? gxClasificar(o, mov==='egreso_compra'?'compra':'gasto').cat : '';
+  const movReal = mov==='ingreso' ? 'ingreso' : 'egreso';
+  return `
+    <div class="field"><label>Categoría *</label>
+      <select name="cat" id="gxCat">${gxOpcionesCat(movReal, sel)}</select>
+      <div class="section-hint" id="gxCatHint" style="margin-top:4px;"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>${movReal==='ingreso'?'Quién pagó / de dónde vino':'A quién se le pagó (proveedor)'}</label>
+        <input type="text" name="proveedor" list="gxProveedores" autocomplete="off" value="${gxEsc(o.proveedor||'')}" placeholder="${movReal==='ingreso'?'Ej: Anthony':'Ej: Súper Más, Carpicenter'}">
+        <datalist id="gxProveedores">${gxProveedoresSugeridos().map(p=>`<option value="${gxEsc(p)}">`).join('')}</datalist>
+      </div>
+      <div class="field"><label>Cómo se pagó</label>
+        <select name="metodoPago">${[['','—'],['efectivo','Efectivo'],['transferencia','Transferencia'],['tarjeta','Tarjeta'],['otro','Otro']].map(([v,t])=>`<option value="${v}" ${(o.metodoPago||'')===v?'selected':''}>${t}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>¿Hay comprobante?</label>
+        <select name="comprobante">${[['','— Elegir —'],['si','Sí, lo tengo'],['no','No tengo'],['na','No aplica']].map(([v,t])=>`<option value="${v}" ${(o.comprobante||'')===v?'selected':''}>${t}</option>`).join('')}</select>
+      </div>
+      <div class="field"><label>N° de factura o ticket (opcional)</label><input type="text" name="comprobanteRef" value="${gxEsc(o.comprobanteRef||'')}"></div>
+    </div>
+    ${conCompromiso ? `<div class="field" id="gxCompromisoWrap" style="display:none;"><label>Monto total acordado (si esto es una seña o un pago parcial)</label>
+      <input type="text" inputmode="decimal" class="input-monto" name="compromisoTotal" value="${o.compromisoTotal||''}" placeholder="Ej: 800.000">
+      <div class="section-hint" style="margin-top:4px;">Sirve para saber cuánto falta pagar. Dejalo vacío si pagaste todo.</div></div>` : ''}
+  `;
+}
+function gxValidarTraza(form, orig, mov, descripcion, monto, hayDescAuto){
+  if(!form.cat || !form.cat.value){
+    if(!(orig && orig.transferenciaId)) return 'Elegí una categoría: así se puede saber en qué se va la plata.';
+  }
+  if(!hayDescAuto && !(orig && orig.id) && descripcion.trim().length<3) return mov==='ingreso' ? 'Contá de dónde vino este ingreso.' : 'Contá en pocas palabras para qué fue (qué se compró o se pagó).';
+  if(mov!=='ingreso' && monto>=500000 && form.comprobante && !form.comprobante.value && !(orig && orig.id)) return 'Es un monto grande: indicá si hay comprobante (sí, no o no aplica).';
+  return '';
+}
+function gxLeerTraza(form, orig, forzarCat){
+  const cat = forzarCat || (form.cat ? form.cat.value : '');
+  const info = cat ? gxCatInfo(cat) : null;
+  const r = {
+    categoria: info ? info.label : ((orig && orig.categoria) || ''),
+    proveedor: form.proveedor ? form.proveedor.value.trim() : '',
+    metodoPago: form.metodoPago ? form.metodoPago.value : '',
+    comprobante: form.comprobante ? form.comprobante.value : '',
+    comprobanteRef: form.comprobanteRef ? form.comprobanteRef.value.trim() : '',
+  };
+  const catFinal = cat || (orig && orig.cat) || '';
+  if(catFinal) r.cat = catFinal;
+  if(form.compromisoTotal){ const v = parseMonto(form.compromisoTotal.value); r.compromisoTotal = v>0 ? v : 0; }
+  if(orig && orig.id && !orig.cat && orig.categoria && info && orig.categoria!==info.label) r.categoriaOriginal = orig.categoria;
+  return r;
+}
+function gxEnlazarFormulario(modalEl, mov){
+  const sel = modalEl.querySelector('#gxCat'); if(!sel) return;
+  const hint = modalEl.querySelector('#gxCatHint');
+  const comp = modalEl.querySelector('#gxCompromisoWrap');
+  const tipoSel = modalEl.querySelector('#gastoTipo') || modalEl.querySelector('#compraTipo');
+  function actualizar(){
+    const info = sel.value ? gxCatInfo(sel.value) : null;
+    let msg = '';
+    if(info){
+      msg = info.grupo.nat==='inversion' ? 'Se cuenta como inversión: no entra en los gastos de operación.' : (info.grupo.nat==='ingreso' ? 'Se cuenta como ingreso.' : 'Se cuenta como gasto de ' + info.grupo.label.toLowerCase() + '.');
+      if(info.sugiereEvento && tipoSel && tipoSel.value==='empresa') msg += ' Este tipo de gasto casi siempre es de un evento: si lo fue, elegí "Evento" arriba.';
+    }
+    if(hint) hint.textContent = msg;
+    if(comp) comp.style.display = (info && info.grupo.nat==='inversion') ? '' : 'none';
+  }
+  sel.addEventListener('change', actualizar);
+  if(tipoSel) tipoSel.addEventListener('change', actualizar);
+  const movSel = modalEl.querySelector('#gastoMovimiento');
+  if(movSel){
+    movSel.addEventListener('change', ()=>{
+      const m = movSel.value==='ingreso' ? 'ingreso' : 'egreso';
+      sel.innerHTML = gxOpcionesCat(m, '');
+      actualizar();
+    });
+  }
+  const origenSel = modalEl.querySelector('#gastoOrigenIngreso');
+  if(origenSel) origenSel.addEventListener('change', ()=>{ if(origenSel.value==='inventario'||origenSel.value==='premix'){ sel.value = 'ing_venta'; actualizar(); } });
+  actualizar();
+}
+
+// ---------- acciones ----------
+function gxAbrirEdicion(key){
+  const i = key.indexOf(':'); const f = key.slice(0,i), ref = key.slice(i+1);
+  if(f==='gasto') openGastoModal(ref); else if(f==='compra') openCompraModal(ref); else if(f==='pago') openPagoModal(ref); else if(f==='cobro') openCobroModal(ref);
+}
+function gxIrA(spec){
+  const [k,v] = spec.split(':');
+  gxF = {mes:gxF.mes, caja:'', tipo:'', grupo:'', cat:'', evento:'', admin:'', texto:''};
+  gxF[k] = v; gxLimite = 120; gxVista = 'movimientos'; renderPanel();
+}
+function gxFijarCategoria(key, cat){
+  const i = key.indexOf(':'); const f = key.slice(0,i), ref = key.slice(i+1);
+  const o = f==='gasto' ? state.gastos.find(x=>x.id===ref) : (f==='compra' ? state.compras.find(x=>x.id===ref) : null);
+  if(!o || !GX_CATS[cat]) return;
+  o.cat = cat;
+  pushLog(adminUnlocked.nombre, 'Categoría confirmada', `${fmtMoney(o.monto)} → ${GX_CATS[cat].label}`);
+  saveState(); renderPanel();
+}
+function gxAceptarSeguras(){
+  const libro = gxLibro();
+  const lista = libro.filter(e=>(e.fuente==='gasto'||e.fuente==='compra') && !e.obj.cat && e.conf==='alta' && e.nat!=='interno' && !e.oculto);
+  if(lista.length===0) return;
+  if(!confirm(`Se va a guardar la categoría sugerida en ${lista.length} movimientos que ya tenían una coincidencia clara. No cambia ningún monto ni saldo. ¿Continuar?`)) return;
+  lista.forEach(e=>{ e.obj.cat = e.cat; });
+  pushLog(adminUnlocked.nombre, 'Categorías confirmadas en bloque', `${lista.length} movimientos`);
+  saveState(); renderPanel();
+}
+function bindGastosUI(){
+  const panel = document.getElementById('panel');
+  if(!panel) return;
+  panel.querySelectorAll('[data-gx-vista]').forEach(b=>b.addEventListener('click', ()=>{ gxVista = b.dataset.gxVista; if(currentTab==='revisar') currentTab='gastos'; render(); }));
+  panel.querySelectorAll('[data-gx-f]').forEach(el=>{
+    const k = el.dataset.gxF;
+    if(k==='texto'){
+      let t;
+      el.addEventListener('input', ()=>{ clearTimeout(t); t = setTimeout(()=>{ gxF.texto = el.value; gxLimite = 120; renderPanel(); const n = document.getElementById('gxTexto'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 400); });
+    } else {
+      el.addEventListener('change', ()=>{ gxF[k] = el.value; if(k==='grupo') gxF.cat = ''; gxLimite = 120; renderPanel(); });
+    }
+  });
+  panel.querySelectorAll('[data-gx-edit]').forEach(b=>b.addEventListener('click', ()=>gxAbrirEdicion(b.dataset.gxEdit)));
+  panel.querySelectorAll('[data-gx-goto]').forEach(b=>b.addEventListener('click', ()=>gxIrA(b.dataset.gxGoto)));
+  panel.querySelectorAll('[data-gx-setcat]').forEach(s=>s.addEventListener('change', ()=>{ if(s.value) gxFijarCategoria(s.dataset.gxSetcat, s.value); }));
+  panel.querySelectorAll('[data-gx-rf]').forEach(b=>b.addEventListener('click', ()=>{ const [k,v]=b.dataset.gxRf.split(':'); gxRF[k] = (gxRF[k]===v && k!=='ver') ? '' : v; renderPanel(); }));
+  panel.querySelectorAll('[data-gx-ok]').forEach(b=>b.addEventListener('click', ()=>{
+    const k = b.dataset.gxOk; const nota = prompt('¿Querés dejar una nota? (opcional — por ejemplo "tengo el comprobante" o "ya se corrigió")', '');
+    if(nota===null) return;
+    state.revisados = state.revisados || {}; state.revisados[k] = {por: adminUnlocked.nombre, ts: Date.now(), nota: (nota||'').trim()};
+    pushLog(adminUnlocked.nombre, 'Marcado como revisado', k.split('|')[0]);
+    saveState(); renderPanel(); }));
+  panel.querySelectorAll('[data-gx-reabrir]').forEach(b=>b.addEventListener('click', ()=>{ if(state.revisados) delete state.revisados[b.dataset.gxReabrir]; saveState(); renderPanel(); }));
+  panel.querySelectorAll('[data-gx-evento]').forEach(b=>b.addEventListener('click', ()=>{ currentTab='eventos'; render(); }));
+  panel.querySelectorAll('[data-gx-aceptar]').forEach(b=>b.addEventListener('click', gxAceptarSeguras));
+  panel.querySelectorAll('[data-gx-limpiar]').forEach(b=>b.addEventListener('click', ()=>{ gxF = {mes:'', caja:'', tipo:'', grupo:'', cat:'', evento:'', admin:'', texto:''}; gxLimite = 120; renderPanel(); }));
+  panel.querySelectorAll('[data-gx-mas]').forEach(b=>b.addEventListener('click', ()=>{ gxLimite += 200; renderPanel(); }));
+  panel.querySelectorAll('[data-gx-csv]').forEach(b=>b.addEventListener('click', ()=>gxExportarCSV(gxAplicarFiltros(gxLibro()))));
+}
+
 function gastoFormFields(g){
   g = g || {tipo:'empresa', movimiento:'egreso'};
   const cajaSugerida = g.cajaId || (state.cajas.find(c=>c.administradorId===(adminUnlocked&&adminUnlocked.id))||{}).id || '';
@@ -4648,8 +5608,8 @@ function gastoFormFields(g){
       <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${g.fecha||todayStr()}"></div>
       <div class="field"><label>Monto</label><input type="text" inputmode="decimal" class="input-monto" name="monto" id="gastoMonto" value="${g.monto||''}"></div>
     </div>
-    <div class="field"><label>Categoría</label><input type="text" name="categoria" value="${g.categoria||''}" placeholder="Seña, inversión, sueldo, gasto diario, equipamiento, venta…"></div>
-    <div class="field"><label>Descripción${g.movimiento==='ingreso'?' (de dónde vino este ingreso)':''}</label><textarea name="descripcion">${g.descripcion||''}</textarea></div>
+    ${g.transferenciaId ? '<div class="section-hint" style="margin-bottom:10px;">Este movimiento es una pata de una transferencia entre cajas: no se categoriza.</div>' : gxCamposTraza(g, g.movimiento==='ingreso'?'ingreso':'egreso', true)}
+    <div class="field"><label>Descripción${g.movimiento==='ingreso'?' (de dónde vino este ingreso)':' (para qué fue)'}</label><textarea name="descripcion">${g.descripcion||''}</textarea></div>
   `;
 }
 function openGastoModal(id){
@@ -4688,6 +5648,7 @@ function openGastoModal(id){
       }
       autocalcular('#gastoCantidadVendida', '#gastoPrecioUnitario');
       autocalcular('#gastoCantidadVendidaPremix', '#gastoPrecioUnitarioPremix');
+      gxEnlazarFormulario(modalEl, 'gasto');
     },
     onSave: (form)=>{
       const movimiento = form.movimiento.value;
@@ -4721,17 +5682,29 @@ function openGastoModal(id){
       }
 
       const montoManual = parseMonto(form.monto.value);
+      const esTransf = !!(g && g.transferenciaId);
+      const forzarVenta = movimiento==='ingreso' && (origenIngreso==='inventario' || origenIngreso==='premix');
+      if(!esTransf){
+        if(forzarVenta && form.cat) form.cat.value = 'ing_venta';
+        const errT = gxValidarTraza(form, g, movimiento, form.descripcion.value || descripcionAuto, montoManual || (cantidadVendida&&precioUnitarioVenta ? Math.round(cantidadVendida*precioUnitarioVenta) : 0), !!descripcionAuto);
+        if(errT) return avisarError(errT);
+      } else if(!confirm('Esto es una pata de una transferencia entre cajas. Si cambiás el monto o la caja, la otra pata no se actualiza sola. ¿Seguir editando?')) return;
       const data = {
         tipo: form.tipo.value,
         eventoId: form.tipo.value==='evento' ? form.eventoId.value : null,
         movimiento, cajaId: form.cajaId.value,
         fecha: form.fecha.value, monto: montoManual || (cantidadVendida&&precioUnitarioVenta ? Math.round(cantidadVendida*precioUnitarioVenta) : 0),
-        categoria: form.categoria.value.trim() || (origenIngreso==='premix' ? 'Venta de pre-mix' : (origenIngreso==='inventario' ? 'Venta de inventario' : '')),
+        categoria: g ? (g.categoria||'') : '',
         descripcion: form.descripcion.value.trim() || descripcionAuto,
         adminId: g ? g.adminId : adminUnlocked.id,
         origenIngreso: origenIngreso,
         insumoId: insumoId, cantidadVendida: cantidadVendida, precioUnitarioVenta: precioUnitarioVenta,
       };
+      if(!esTransf) Object.assign(data, gxLeerTraza(form, g));
+      if(!(g && g.id)) data.ts = Date.now();
+      if(!data.fecha) return avisarError('Elegí la fecha.');
+      if(!(data.monto>0)) return avisarError('Ingresá un monto mayor a cero.');
+      if(buscarDuplicado('gastos', data, g ? g.id : null)) return avisarDuplicado(data.movimiento==='ingreso' ? 'un ingreso' : 'un gasto');
       const cajaNombre = (state.cajas.find(c=>c.id===data.cajaId)||{}).nombre || '';
       let gastoGuardado;
       if(g){
@@ -5029,6 +6002,7 @@ function openTransferenciaModal(cajaOrigenId){
       const monto = parseMonto(form.monto.value);
       if(monto<=0) return alert('Ingresá un monto válido.');
       const cajaDestinoId = form.cajaDestinoId.value;
+      if(state.transferenciasCaja.some(t=>t.estado==='pendiente' && t.cajaOrigenId===cajaOrigenId && t.cajaDestinoId===cajaDestinoId && Number(t.monto)===monto && t.fecha===todayStr())) return avisarDuplicado('una transferencia pendiente');
       state.transferenciasCaja.push({
         id: uid(), cajaOrigenId, cajaDestinoId, monto, motivo: form.motivo.value.trim(),
         fecha: todayStr(), estado: 'pendiente', solicitanteId: adminUnlocked.id,
@@ -5261,6 +6235,9 @@ function openPagoModal(id){
         fecha: form.fecha.value, monto: parseMonto(form.monto.value), descripcion: form.descripcion.value.trim(),
         cajaId: form.cajaId.value, adminId: p ? p.adminId : adminUnlocked.id,
       };
+      if(!data.fecha) return avisarError('Elegí la fecha del pago.');
+      if(!(data.monto>0)) return avisarError('Ingresá un monto mayor a cero.');
+      if(buscarDuplicado('pagos', data, p ? p.id : null)) return avisarDuplicado('un pago');
       const perNombre = (personaDe(data.personaId)||{}).nombre || '(persona eliminada)';
       const cajaNombre = (state.cajas.find(x=>x.id===data.cajaId)||{}).nombre || '';
       if(p){ Object.assign(p, data); pushLog(adminUnlocked.nombre, 'Pago de personal editado', `${fmtMoney(data.monto)} — ${perNombre} — ${cajaNombre}`); } else { state.pagos.push(Object.assign({id:uid()}, data)); pushLog(adminUnlocked.nombre, 'Pago de personal registrado', `${fmtMoney(data.monto)} — ${perNombre} — ${cajaNombre}`); }
@@ -5297,6 +6274,7 @@ function openGenerarPagoTotalModal(personaId){
     `,
     customSubmitLabel: 'Generar pago',
     onSave: (form)=>{
+      if(diasPend.some(r=>r.pagado) || gastosPend.some(g=>g.pagado)){ closeModal(); render(); alert('Estos registros ya fueron pagados. Se actualizó la pantalla.'); return; }
       const detalles = [];
       if(diasPend.length>0) detalles.push(`${diasPend.length} día(s) trabajado(s)`);
       if(gastosPend.length>0) detalles.push(`${gastosPend.length} gasto(s) reembolsados`);
@@ -5329,6 +6307,7 @@ function openGenerarPagoDiasModal(personaId){
     `,
     customSubmitLabel: 'Generar pago',
     onSave: (form)=>{
+      if(regs.some(r=>r.pagado)){ closeModal(); render(); alert('Estos días ya fueron pagados. Se actualizó la pantalla.'); return; }
       state.pagos.push({
         id: uid(), personaId, eventoId: null, fecha: form.fechaPago.value || todayStr(),
         monto: total, descripcion: `Pago de días trabajados (${regs.map(r=>fmtDate(r.fecha)).join(', ')})`,
@@ -5356,6 +6335,7 @@ function openGenerarPagoGastoModal(gastoId){
     `,
     customSubmitLabel: 'Generar pago',
     onSave: (form)=>{
+      if(g.pagado){ closeModal(); render(); alert('Este reembolso ya fue pagado. Se actualizó la pantalla.'); return; }
       state.pagos.push({
         id: uid(), personaId: g.personaId, eventoId: null, fecha: form.fechaPago.value || todayStr(),
         monto: g.monto, descripcion: `Reembolso de gasto: ${g.descripcion||''}`,
@@ -5480,6 +6460,22 @@ function openImportPagoModal(){
       const cajaId = form.cajaIdPago.value;
       let total = 0;
       const detalles = [];
+      const yaCargados = [];
+      parsedEntries.forEach(e=>{
+        if(e.incluir && state.produccion.some(r=>r.personaId===parsedPersonaId && r.fecha===e.fecha && _norm(r.funcion)===_norm(e.funcion) && _norm(r.descripcion)===_norm(e.descripcion))){
+          e.incluir = false; yaCargados.push(`${fmtDate(e.fecha)} ${e.funcion}`);
+        }
+      });
+      parsedGastos.forEach(g=>{
+        if(g.incluir && state.gastosPersonal.some(x=>x.personaId===parsedPersonaId && x.fecha===g.fecha && Number(x.monto)===Number(g.monto) && _norm(x.descripcion)===_norm(g.descripcion))){
+          g.incluir = false; yaCargados.push(`reembolso ${g.descripcion||''}`);
+        }
+      });
+      if(yaCargados.length>0 && !parsedEntries.some(e=>e.incluir) && !parsedGastos.some(g=>g.incluir)){
+        avisarError('Todo este reporte ya estaba cargado ('+yaCargados.join(', ')+'). No se guardó nada para no duplicar.');
+        return;
+      }
+      if(yaCargados.length>0) alert('Se omitieron por estar ya cargados: '+yaCargados.join(', ')+'.');
       parsedEntries.filter(e=>e.incluir).forEach(e=>{
         const tarifa = tarifaPara(persona, e.funcion, e.fueraAsuncion);
         const horas = (e.horasExtra||0) * HORA_ADICIONAL_STAFF_PRECIO;
@@ -5533,11 +6529,11 @@ function resumenPorAdmin(mesFiltro){
 
     const categorias = {};
     state.gastos.filter(g=>g.adminId===a.id && g.movimiento==='egreso' && enMes(g.fecha)).forEach(g=>{
-      const cat = g.categoria || 'Gasto sin categoría';
+      const cat = gxEtiquetaCat(g,'gasto');
       categorias[cat] = (categorias[cat]||0) + (Number(g.monto)||0);
     });
     state.compras.filter(c=>c.adminId===a.id && enMes(c.fecha)).forEach(c=>{
-      const cat = c.categoria ? `Compra: ${c.categoria}` : 'Compra sin categoría';
+      const cat = 'Compra: ' + gxEtiquetaCat(c,'compra');
       categorias[cat] = (categorias[cat]||0) + (Number(c.monto)||0);
     });
     if(egresosPagosPersonal>0) categorias['Pagos a personal'] = (categorias['Pagos a personal']||0) + egresosPagosPersonal;
@@ -5774,7 +6770,7 @@ function renderActividad(){
       <tbody>
       ${rows.map(l=>`
         <tr>
-          <td class="mono" style="white-space:nowrap;">${new Date(l.ts).toLocaleString('es-PY',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'})}</td>
+          <td class="mono" style="white-space:nowrap;">${fmtFechaHora24(l.ts)}</td>
           <td>${l.actor}</td>
           <td>${l.accion}</td>
           <td style="color:var(--cream-dim);">${l.detalle||''}</td>
@@ -5942,14 +6938,17 @@ function renderModal(){
   let modalSubmitLock = false;
   const doModalSubmit = ()=>{
     if(modalSubmitLock) return;
+    // queda bloqueado hasta que el guardado termine: un segundo toque no puede registrar el movimiento dos veces
     modalSubmitLock = true;
-    setTimeout(()=>{ modalSubmitLock = false; }, 400);
     try{
       modalContent.onSave(formEl);
     }catch(err){
       console.error('Error al guardar', err);
       const el = document.getElementById('modalSaveError');
       if(el){ el.textContent = 'Ocurrió un error al guardar: ' + err.message; el.style.display = 'block'; }
+    }finally{
+      // si el modal sigue abierto (faltó un dato, hubo un error), se vuelve a habilitar el botón
+      if(modalContent && document.getElementById('modalBg')) modalSubmitLock = false;
     }
   };
   const modalSubmitBtn = document.getElementById('modalSubmit');
@@ -5964,6 +6963,7 @@ function closeModal(){ modalContent = null; }
 function bindPanelEvents(){
   const panel = document.getElementById('panel');
   bindArmarEventos();
+  if(currentTab==='gastos' || currentTab==='revisar') bindGastosUI();
 
   // calendario nav
   const prev = document.getElementById('calPrev');
@@ -6178,7 +7178,7 @@ function bindPanelEvents(){
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
       cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
-      prestamosAdmin: state.prestamosAdmin,
+      prestamosAdmin: state.prestamosAdmin, revisados: state.revisados || {},
     }, null, 2);
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -6222,7 +7222,7 @@ function bindPanelEvents(){
         state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
         state.kits = parsed.kits || [];
         state.prestamos = parsed.prestamos || [];
-        state.prestamosAdmin = parsed.prestamosAdmin || [];
+        state.prestamosAdmin = parsed.prestamosAdmin || []; state.revisados = parsed.revisados || {};
         if(parsed.admins && parsed.admins.length) state.admins = parsed.admins;
         if(parsed.log && parsed.log.length) state.log = parsed.log;
         pushLog(adminUnlocked.nombre, 'Importó copia de seguridad completa', file.name);
