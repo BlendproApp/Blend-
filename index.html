@@ -16,7 +16,7 @@
 <link rel="manifest" href="data:application/manifest+json,%7B%22name%22%3A%22Blend%20-%20Gesti%C3%B3n%20de%20Eventos%22%2C%22short_name%22%3A%22Blend%22%2C%22start_url%22%3A%22.%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%23182818%22%2C%22theme_color%22%3A%22%23182818%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%253Csvg%2520xmlns%3D%2527http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%2527%2520viewBox%3D%25270%25200%2520100%2520100%2527%253E%253Crect%2520width%3D%2527100%2527%2520height%3D%2527100%2527%2520fill%3D%2527%2523182818%2527%2F%253E%253Ctext%2520x%3D%252750%2527%2520y%3D%252768%2527%2520font-family%3D%2527Georgia%2Cserif%2527%2520font-size%3D%252758%2527%2520font-weight%3D%2527bold%2527%2520fill%3D%2527%2523f3ede0%2527%2520text-anchor%3D%2527middle%2527%253EB%253C%2Ftext%253E%253C%2Fsvg%253E%22%2C%22sizes%22%3A%22192x192%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%7D%5D%7D">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -429,7 +429,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     margin:0;
     background:var(--ink);
     color:var(--cream);
-    font-family:'Work Sans', sans-serif;
+    font-family:'Open Sans', system-ui, sans-serif;
     -webkit-font-smoothing:antialiased;
   }
   h1,h2,h3,.display{
@@ -474,7 +474,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   .tab-grupo-scroll::-webkit-scrollbar{ display:none; }
   nav.tabs button{
     background:none; border:none; color:var(--cream-dim);
-    font-family:'Work Sans', sans-serif; font-size:0.88rem; font-weight:500;
+    font-family:'Open Sans', system-ui, sans-serif; font-size:0.88rem; font-weight:500;
     padding:10px 14px; cursor:pointer; white-space:nowrap; flex-shrink:0;
     border-bottom:2px solid transparent; transition:all .15s ease;
   }
@@ -489,7 +489,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   }
   nav.secciones-nav button{
     background:var(--ink-2); border:1px solid var(--line); color:var(--cream-dim);
-    font-family:'Work Sans', sans-serif; font-size:0.86rem; font-weight:600;
+    font-family:'Open Sans', system-ui, sans-serif; font-size:0.86rem; font-weight:600;
     padding:10px 16px; border-radius:11px; cursor:pointer; white-space:nowrap; flex-shrink:0;
     transition:all .15s ease; display:flex; align-items:center; gap:7px;
   }
@@ -500,7 +500,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   nav.sub-tabs{ display:flex; flex-wrap:wrap; gap:4px; margin:14px 0 24px; border-bottom:1px solid var(--line); padding-bottom:0; }
   nav.sub-tabs button{
     background:none; border:none; color:var(--cream-dim);
-    font-family:'Work Sans', sans-serif; font-size:0.84rem; font-weight:500;
+    font-family:'Open Sans', system-ui, sans-serif; font-size:0.84rem; font-weight:500;
     padding:9px 12px; cursor:pointer; white-space:nowrap;
     border-bottom:2px solid transparent; transition:all .15s ease;
   }
@@ -523,7 +523,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
   button.btn{
     background:var(--copper); color:#181008; border:none; border-radius:8px;
-    font-family:'Work Sans', sans-serif; font-weight:600; font-size:0.85rem;
+    font-family:'Open Sans', system-ui, sans-serif; font-weight:600; font-size:0.85rem;
     padding:10px 16px; cursor:pointer; transition:background .15s ease;
   }
   button.btn:hover{ background:var(--copper-bright); }
@@ -590,7 +590,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   .field label{ display:block; font-size:0.76rem; color:var(--cream-dim); margin-bottom:5px; text-transform:uppercase; letter-spacing:0.4px; }
   .field input[type=text], .field input[type=number], .field input[type=date], .field select, .field textarea{
     width:100%; background:var(--ink); border:1px solid var(--line); border-radius:4px;
-    color:var(--cream); font-family:'Work Sans', sans-serif; font-size:0.9rem; padding:9px 10px;
+    color:var(--cream); font-family:'Open Sans', system-ui, sans-serif; font-size:0.9rem; padding:9px 10px;
   }
   .field textarea{ min-height:60px; resize:vertical; }
   .field input:focus, .field select:focus, .field textarea:focus{ outline:none; border-color:var(--copper); }
@@ -662,6 +662,77 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     .cal-day{ min-height:44px; padding:3px 4px; }
   }
 
+  /* ===== Rediseño: panel oscuro verde (bosque + terracota) ===== */
+  :root{
+    --ink:#0e1b15; --ink-2:#15271e; --ink-3:#1c3328; --line:#2a4236;
+    --cream:#efe8da; --cream-dim:#a3b0a2;
+    --copper:#c9704a; --copper-bright:#e08a62; --copper-dim:#8f4f33;
+    --sage:#86b890; --sage-dim:#2f5a3e;
+    --red:#d97a68; --red-dim:#7a3f36;
+    --gold:#dcae52; --violet:#8fa3b8; --olive:#86b890;
+    --accent-ink:#1a0f09; --shadow:none;
+    color-scheme:dark;
+  }
+  [data-theme="light"]{
+    --ink:#edf0e8; --ink-2:#fafbf6; --ink-3:#e3e9dc; --line:#ccd6c6;
+    --cream:#15241b; --cream-dim:#586656;
+    --copper:#a9532c; --copper-bright:#a9532c; --copper-dim:#c98a6c;
+    --sage:#2f6b3f; --sage-dim:#cfe0d1;
+    --red:#a8402f; --red-dim:#e6bdb4;
+    --gold:#8a5f10; --violet:#51657a; --olive:#2f6b3f;
+    --accent-ink:#fff8f2; --shadow:0 1px 2px rgba(21,36,27,0.06);
+    color-scheme:light;
+  }
+  body{ font-size:15px; line-height:1.5; }
+  h1,h2,h3,.display{ letter-spacing:0; }
+  .mono,.stat .v,td.mono{ font-variant-numeric:tabular-nums; }
+  header.top{ border-bottom:1px solid var(--line); }
+  header.top .brand .mark{ color:var(--cream); letter-spacing:0.02em; }
+  header.top .brand .sub{ letter-spacing:0.2em; font-size:0.7rem; font-weight:600; }
+  nav.secciones-nav{ gap:6px; margin:18px 0 6px; }
+  nav.secciones-nav button{ background:transparent; border:1px solid transparent; border-radius:10px; padding:9px 14px; font-weight:600; }
+  nav.secciones-nav button:hover{ background:var(--ink-2); color:var(--cream); border-color:var(--line); }
+  nav.secciones-nav button.active{ background:var(--ink-3); border-color:var(--line); color:var(--cream); }
+  nav.secciones-nav button.active .ico{ color:var(--copper-bright); }
+  nav.sub-tabs{ margin:10px 0 22px; }
+  nav.tabs button.active, nav.sub-tabs button.active{ color:var(--cream); border-bottom-color:var(--copper); }
+  button.btn{ background:var(--copper); color:var(--accent-ink); border-radius:8px; font-weight:600; }
+  button.btn:hover{ background:var(--copper-bright); }
+  button.btn.ghost{ background:var(--ink-2); color:var(--cream); border:1px solid var(--line); }
+  button.btn.ghost:hover{ border-color:var(--cream-dim); color:var(--cream); }
+  button.btn:disabled{ opacity:0.45; cursor:not-allowed; }
+  :focus-visible{ outline:2px solid var(--copper); outline-offset:2px; }
+  .card{ background:var(--ink-2); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); }
+  .card.featured, .stat.featured{ border-color:var(--copper-dim); background:var(--ink-3); }
+  .stat{ background:var(--ink-2); border:1px solid var(--line); border-radius:14px; box-shadow:var(--shadow); }
+  .stat .k{ font-weight:600; letter-spacing:0.14em; font-size:0.68rem; }
+  .stat .v{ color:var(--cream); font-size:1.55rem; }
+  .stat .v.sage{ color:var(--sage); } .stat .v.red{ color:var(--red); }
+  .section-title{ font-size:1.5rem; }
+  th{ font-weight:600; letter-spacing:0.12em; font-size:0.68rem; }
+  td{ border-bottom:1px solid var(--line); }
+  tr:hover td{ background:var(--ink-3); }
+  .badge.reservado{ background:color-mix(in srgb, var(--sage) 20%, transparent); color:var(--sage); }
+  .badge.posible{ background:color-mix(in srgb, var(--copper) 20%, transparent); color:var(--copper-bright); }
+  .badge.pagado{ background:color-mix(in srgb, var(--gold) 20%, transparent); color:var(--gold); }
+  .badge.senado{ background:color-mix(in srgb, var(--cream-dim) 18%, transparent); color:var(--cream-dim); }
+  .chip-fecha{ background:var(--copper); color:var(--accent-ink); }
+  .modal-bg{ background:rgba(5,12,8,0.72); }
+  .modal{ border-radius:16px; background:var(--ink-2); }
+  .field input[type=text], .field input[type=number], .field input[type=date], .field input[type=password], .field select, .field textarea{ background:var(--ink); border-radius:8px; }
+  .field input:focus, .field select:focus, .field textarea:focus{ border-color:var(--copper); box-shadow:0 0 0 3px color-mix(in srgb, var(--copper) 22%, transparent); }
+  .chip-select span{ border-radius:20px; }
+  .chip-select span.on{ background:var(--sage-dim); border-color:var(--sage); color:var(--cream); }
+  .empty{ border-radius:14px; }
+  .cal-day{ border-radius:8px; background:var(--ink-2); }
+  .cal-day.today{ border-color:var(--copper); box-shadow:inset 0 0 0 1px var(--copper); }
+  .cal-nav button{ border-radius:8px; }
+  .balance-box .b{ border-radius:8px; background:var(--ink); }
+  .gx-pill.on{ background:var(--copper); border-color:var(--copper); color:var(--accent-ink); }
+  .gx-pill.on b{ color:var(--accent-ink); }
+  .gx-chip{ color:var(--cream); }
+  ::-webkit-scrollbar-thumb{ background:var(--line); }
+
   @media print{
     header.top button, header.top .date{ display:none !important; }
     body{ background:#fff; color:#1a1a1a; }
@@ -720,7 +791,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 </head>
 <body>
 <div id="app">
-  <div style="min-height:100vh; background:#182818; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#f3ede0;">
+  <div style="min-height:100vh; background:#0e1b15; display:flex; flex-direction:column; align-items:center; justify-content:center; color:#efe8da;">
     <div style="font-family:'Fraunces',Georgia,serif; font-weight:700; font-size:2.6rem; letter-spacing:1px;">BLEND</div>
     <div style="font-size:0.75rem; letter-spacing:4px; margin-top:6px; opacity:0.8;">COCTELERÍA</div>
     <div style="margin-top:40px; font-size:0.85rem; opacity:0.7;">Cargando…</div>
@@ -744,9 +815,9 @@ function todosLosRoles(){ return ROLES.concat(state.rolesExtra||[]); }
 const TIPOS_TRABAJO = ['Logística','Limpieza','Producción'];
 const ACCIONES_LOG_LIMITE = 500;
 
-let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [], prestamos: [], prestamosAdmin: [], revisados: {} };
+let state = { eventos: [], personal: [], produccion: [], compras: [], gastos: [], pagos: [], admins: [], log: [], tarifas: {}, tarifasFueraAsuncion: {}, cajas: [], recetario: [], cobros: [], presupuestos: [], presupuestoConfig: null, insumos: [], movimientosInsumo: [], tiposEvento: [], gastosPersonal: [], colaboradoresLimitados: [], cargosAdicionales: [], transferenciasCaja: [], rolesExtra: [], ultimoArchivadoTs: 0, kits: [], prestamos: [], prestamosAdmin: [], revisados: {}, arqueos: [], ajustesCaja: [] };
 let colaboradorLimitadoUnlocked = null;
-let currentTheme = (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+let currentTheme = 'dark';
 function toggleTheme(){
   currentTheme = currentTheme === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', currentTheme);
@@ -1050,7 +1121,7 @@ async function loadState(intentoNro){
       state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
       state.kits = parsed.kits || [];
       state.prestamos = parsed.prestamos || [];
-      state.prestamosAdmin = parsed.prestamosAdmin || []; state.revisados = parsed.revisados || {};
+      state.prestamosAdmin = parsed.prestamosAdmin || []; state.revisados = parsed.revisados || {}; state.arqueos = parsed.arqueos || []; state.ajustesCaja = parsed.ajustesCaja || [];
       migrarProduccionAntigua();
       migrarRecetarioNuevosTragos();
       state.insumos.forEach(ins=>{ if(!ins.tipo) ins.tipo = 'herramienta'; });
@@ -1122,7 +1193,7 @@ async function saveState(intentoNro){
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
       cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
-      prestamosAdmin: state.prestamosAdmin, revisados: state.revisados || {},
+      prestamosAdmin: state.prestamosAdmin, revisados: state.revisados || {}, arqueos: state.arqueos || [], ajustesCaja: state.ajustesCaja || [],
     };
     // red de seguridad: Firestore rechaza el documento ENTERO si algún campo, en cualquier parte, quedó en "undefined"
     // (fue justo lo que pasó con un campo nuevo de préstamos). Este viaje por JSON limpia cualquier "undefined" a null/omitido
@@ -1398,7 +1469,9 @@ function saldoCaja(cajaId){
   // Uno nuevo sí resta al otorgarse, y cada abono que se registre después sí suma a la caja donde se devuelve.
   const egresosPrestamosAdmin = sumaWhere((state.prestamosAdmin||[]), pr=>pr.cajaId===cajaId && !pr.esHistorico);
   const ingresosPagosPrestamosAdmin = (state.prestamosAdmin||[]).reduce((s,pr)=> s + sumaWhere(pr.pagos||[], pg=>pg.cajaId===cajaId), 0);
-  return inicial + ingresosGastos + ingresosCobros + ingresosPagosPrestamosAdmin - egresosGastos - egresosCompras - egresosPagos - egresosPrestamosAdmin;
+  // Ajustes de caja: solo cuentan los APROBADOS por otro administrador.
+  const ajustesAprobados = (state.ajustesCaja||[]).filter(a=>a.cajaId===cajaId && a.estado==='aprobado').reduce((s,a)=>s+(a.tipo==='ingreso'?1:-1)*(Number(a.monto)||0),0);
+  return inicial + ingresosGastos + ingresosCobros + ingresosPagosPrestamosAdmin + ajustesAprobados - egresosGastos - egresosCompras - egresosPagos - egresosPrestamosAdmin;
 }
 function montoPagadoPrestamoAdmin(pr){ return (pr.pagos||[]).reduce((s,pg)=>s+(Number(pg.monto)||0),0); }
 function saldoPendientePrestamoAdmin(pr){ return Math.max(0, (Number(pr.monto)||0) - montoPagadoPrestamoAdmin(pr)); }
@@ -1515,6 +1588,7 @@ function render(){
       ['revisar','A revisar'+gxBadgeRevisar()],
       ['cobros','Cobros'],
       ['cajas','Cajas'],
+      ['arqueos','Arqueos y ajustes'+arqBadge()],
       ['prestamosAdmin','Préstamos a Administradores'],
     ]},
     { id: 'catalogo', label: 'Catálogo', icon: '◇', tabs: [
@@ -1632,13 +1706,14 @@ function renderPanel(){
     gastos: renderGastos,
     revisar: ()=>{ gxVista='revisar'; return renderGastos(); },
     cajas: renderCajas,
+    arqueos: renderArqueos,
     prestamosAdmin: renderPrestamosAdmin,
     pagos: renderPagos,
     reportes: renderReportes,
     actividad: renderActividad,
     administradores: renderAdministradores,
   };
-  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','revisar','cajas','prestamosAdmin','pagos','reportes','actividad','administradores']);
+  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','revisar','cajas','arqueos','prestamosAdmin','pagos','reportes','actividad','administradores']);
   if(adminOnly.has(currentTab) && !adminUnlocked){
     panel.innerHTML = `<div class="empty">Necesitás ingresar como administrador para ver esta sección.</div>`;
     return;
@@ -4735,6 +4810,7 @@ const GX_CATS = {
   int_transf:{g:'int', label:'Transferencia entre cajas'},
   int_prestadm:{g:'int', label:'Préstamo a administrador'},
   int_abono:{g:'int', label:'Devolución de préstamo de administrador'},
+  int_ajuste:{g:'int', label:'Ajuste de caja aprobado'},
   sin:{g:'sin', label:'Sin clasificar'},
 };
 const GX_PRIORIDAD_ALTA = new Set(['cli_regalo']);
@@ -4858,6 +4934,12 @@ function gxLibro(){
         cat:'int_abono', conf:'alta', nota:'', detalle:pg.nota||pg.descripcion||'', catOriginal:'', proveedor:adm, org:'Devolución de '+adm, dst:'Caja '+gxCajaNombre(pg.cajaId), obj:pr});
     });
   });
+  (state.ajustesCaja||[]).filter(a=>a.estado==='aprobado').forEach(a=>{
+    const nom = gxCajaNombre(a.cajaId), ing = a.tipo==='ingreso';
+    base({fuente:'ajuste', ref:a.id, fecha:a.fecha, signo: ing?1:-1, monto:a.monto, cajaId:a.cajaId, adminId:a.solicitanteId, eventoId:null, centro:null,
+      cat:'int_ajuste', conf:'alta', nota:'', detalle:a.motivo||'', catOriginal:'', proveedor:'', ts:a.ts, obj:a,
+      org: ing ? 'Ajuste aprobado (sobrante)' : 'Caja '+nom, dst: ing ? 'Caja '+nom : 'Ajuste aprobado (faltante)'});
+  });
   return out;
 }
 
@@ -4877,8 +4959,9 @@ function gxMeses(libro){ return [...new Set(libro.map(e=>gxMes(e.fecha)).filter(
 
 // Totales de una lista de movimientos. Los internos (transferencias, préstamos entre socios) quedan aparte.
 function gxTotales(lista){
-  const t = {ing:0, gasto:0, inversion:0, personal:0, internoIn:0, internoOut:0, porGrupo:{}, porCat:{}, ingPorCat:{}, n:0};
+  const t = {ing:0, gasto:0, inversion:0, personal:0, internoIn:0, internoOut:0, ajustes:0, porGrupo:{}, porCat:{}, ingPorCat:{}, n:0};
   lista.forEach(e=>{
+    if(e.cat==='int_ajuste'){ t.ajustes += e.signo*e.monto; return; }
     if(e.oculto && e.nat==='interno'){ t.internoIn += e.monto; return; }
     t.n++;
     if(e.nat==='interno'){ if(e.signo<0) t.internoOut += e.monto; else t.internoIn += e.monto; return; }
@@ -4976,6 +5059,18 @@ function gxRevisiones(libro){
     const patas = libro.filter(e=>e.fuente==='gasto' && e.obj.transferenciaId===t.id);
     if(patas.length!==2) push('transferencia_incompleta','alta',{key:'transferencia:'+t.id, fuente:'transferencia', ref:t.id, fecha:t.fecha, signo:-1, monto:Number(t.monto)||0, nat:'interno', cat:'int_transf', cajaId:t.cajaOrigenId, adminId:t.resolvioId, detalle:t.motivo||'Transferencia entre cajas', org:'Caja '+gxCajaNombre(t.cajaOrigenId), dst:'Caja '+gxCajaNombre(t.cajaDestinoId), conf:'alta', synthetic:true},'La transferencia aceptada tiene '+patas.length+' movimiento(s) en vez de 2: una caja quedó sin su salida o su entrada.');
   });
+  // ---- arqueos y ajustes de caja
+  (state.cajas||[]).forEach(c=>{
+    const es = arqEstado(c);
+    const sint = (key,det,monto,signo)=>({key, fuente:'arqueo', ref:c.id, fecha: es.u?es.u.fecha:'', signo:signo||-1, monto:monto||0, nat:'interno', cat:'int_ajuste', cajaId:c.id, adminId:c.administradorId||null, detalle:det, org:'', dst:'', conf:'alta', synthetic:true});
+    if(es.tipo==='nunca') push('arqueo_atrasado','media',sint('arqueo:'+c.id+':nunca','Caja "'+c.nombre+'": todavía no tiene ningún arqueo.'),'Contar el efectivo y compararlo con el sistema una vez por semana evita que las diferencias se acumulen.');
+    else if(es.tipo==='atrasado') push('arqueo_atrasado','media',sint('arqueo:'+c.id+':'+es.u.id,'Caja "'+c.nombre+'": último arqueo el '+es.u.fecha+'.'),'Pasaron '+es.dias+' días (se recomienda uno cada '+ARQ_DIAS+').');
+    const u = es.u;
+    if(u && u.diferencia!==0 && !(state.ajustesCaja||[]).some(x=>x.arqueoId===u.id && x.estado!=='rechazado')) push('arqueo_diferencia','media',sint('arqueo:'+u.id,'Caja "'+c.nombre+'": el arqueo del '+u.fecha+' dio diferencia.',Math.abs(u.diferencia),u.diferencia>0?1:-1),'El último arqueo '+arqDifTxt(u.diferencia).toLowerCase()+' y todavía no se pidió ningún ajuste. Revisá el extracto de la caja.');
+  });
+  (state.ajustesCaja||[]).filter(a=>a.estado==='pendiente').forEach(a=>{
+    push('ajuste_pendiente','alta',{key:'ajuste:'+a.id, fuente:'arqueo', ref:a.cajaId, fecha:a.fecha, signo:a.tipo==='ingreso'?1:-1, monto:a.monto, nat:'interno', cat:'int_ajuste', cajaId:a.cajaId, adminId:a.solicitanteId, detalle:a.motivo||'', org:'', dst:'', conf:'alta', synthetic:true},'Ajuste esperando aprobación de otro administrador. Mientras tanto no cambia el saldo.');
+  });
   // ---- eventos y cobros
   const hoy2 = todayStr();
   (state.eventos||[]).forEach(ev=>{
@@ -5016,16 +5111,19 @@ const GX_REV_TITULOS = {
   transferencia_incompleta:['Transferencias incompletas','Una caja tiene la salida pero la otra no tiene la entrada (o al revés).'],
   evento_sin_cobro:['Eventos realizados con cobro pendiente','El evento ya pasó y no se cobró todo lo acordado.'],
   sobrecobro:['Eventos cobrados de más','Se cobró más que el precio del evento.'],
+  arqueo_atrasado:['Arqueos atrasados','Falta contar el efectivo de la caja y compararlo con el sistema.'],
+  arqueo_diferencia:['Arqueos con diferencia sin ajuste','El conteo no coincidió con el sistema y todavía no se resolvió.'],
+  ajuste_pendiente:['Ajustes esperando aprobación','Otro administrador tiene que aprobarlos o rechazarlos.'],
 };
 const GX_REV_AREAS = {
   pagos:['Pagos al equipo',['pago_duplicado','pago_atipico','pago_persona_eliminada','pagos_sin_evento']],
   gastos:['Gastos y compras',['doble_registro','posible_duplicado','sin_detalle','sin_clasificar','categoria_dudosa','pago_parcial','empresa_de_evento','sin_comprobante','monto_atipico','carga_caja_ajena','carga_tardia','fecha_futura']],
-  cajas:['Cajas',['caja_inexistente','caja_negativa','transferencia_incompleta']],
+  cajas:['Cajas',['ajuste_pendiente','arqueo_diferencia','arqueo_atrasado','caja_inexistente','caja_negativa','transferencia_incompleta']],
   eventos:['Eventos y cobros',['evento_sin_cobro','sobrecobro','evento_inexistente']],
 };
 function gxAreaDe(tipo){ for(const [a,[,t]] of Object.entries(GX_REV_AREAS)) if(t.includes(tipo)) return a; return 'gastos'; }
 function gxRevEstado(r){ return (state.revisados||{})[r.k] || null; }
-const GX_REV_ORDEN = ['doble_registro','posible_duplicado','pago_duplicado','transferencia_incompleta','caja_inexistente','evento_sin_cobro','sobrecobro','caja_negativa','sin_detalle','sin_clasificar','pago_persona_eliminada','pago_atipico','monto_atipico','categoria_dudosa','pago_parcial','carga_caja_ajena','empresa_de_evento','pagos_sin_evento','sin_comprobante','fecha_futura','evento_inexistente','carga_tardia'];
+const GX_REV_ORDEN = ['doble_registro','posible_duplicado','pago_duplicado','ajuste_pendiente','transferencia_incompleta','arqueo_diferencia','caja_inexistente','evento_sin_cobro','sobrecobro','caja_negativa','sin_detalle','sin_clasificar','pago_persona_eliminada','pago_atipico','monto_atipico','arqueo_atrasado','categoria_dudosa','pago_parcial','carga_caja_ajena','empresa_de_evento','pagos_sin_evento','sin_comprobante','fecha_futura','evento_inexistente','carga_tardia'];
 
 // Control: lo que suman los movimientos tiene que coincidir con lo que dicen las cajas.
 function gxControlCajas(libro){
@@ -5056,7 +5154,12 @@ function gxSelect(key, valor, opciones, etiqueta){
   return `<label class="gx-fl"><span>${etiqueta}</span><select data-gx-f="${key}">${opciones.map(([v,t])=>`<option value="${gxEsc(v)}" ${String(valor)===String(v)?'selected':''}>${gxEsc(t)}</option>`).join('')}</select></label>`;
 }
 function gxSelMes(libro){ return gxSelect('mes', gxF.mes, [['','Todo el historial']].concat(gxMeses(libro).map(m=>[m, gxMesLabel(m)])), 'Período'); }
-function gxEdicionBtn(e){ return ['prestamoAdmin','abonoPrestamoAdmin','resumen','transferencia'].includes(e.fuente) ? (e.fuente==='evento'?'':'') : (e.fuente==='evento' ? '<button class="btn small ghost" data-gx-evento="'+gxEsc(e.ref)+'">Ver evento</button>' : `<button class="btn small ghost" data-gx-edit="${gxEsc(e.key)}">Editar</button>`); }
+function gxEdicionBtn(e){
+  if(e.fuente==='evento') return '<button class="btn small ghost" data-gx-evento="'+gxEsc(e.ref)+'">Ver evento</button>';
+  if(e.fuente==='arqueo') return '<button class="btn small ghost" data-gx-arq>Ir a Arqueos</button>';
+  if(['prestamoAdmin','abonoPrestamoAdmin','resumen','transferencia','ajuste'].includes(e.fuente)) return '';
+  return `<button class="btn small ghost" data-gx-edit="${gxEsc(e.key)}">Editar</button>`;
+}
 function gxSigno(e){ return (e.signo>0?'+':'-')+fmtMoney(e.monto); }
 function gxColorMonto(e){ return e.nat==='interno' ? 'var(--violet)' : (e.signo>0 ? 'var(--sage)' : 'var(--red)'); }
 function gxRevPendientes(rev){ return rev.filter(r=>r.sev!=='baja' && !gxRevEstado(r)).length; }
@@ -5113,6 +5216,7 @@ function gxVistaResumen(libro, rev){
             <div class="gx-fila"><div class="gx-fila-top"><span>${gxChip(g)}</span><span class="mono">${fmtMoney(v)} <small style="color:var(--cream-dim);">· ${gxPct(v,t.egresos)}%</small></span></div>${gxBar(gxPct(v,t.egresos), GX_GRUPOS[g].color)}</div>
           </summary>
           <div class="gx-sub">${catsDeGrupo(g).map(([c,x])=>`<div class="gx-subfila"><a href="javascript:void(0)" data-gx-goto="cat:${c}">${gxEsc(GX_CATS[c].label)}</a><span class="mono">${fmtMoney(x.total)} <small>(${x.n})</small></span></div>`).join('')}</div></details>`).join('')}
+        ${t.ajustes ? `<div class="section-hint" style="margin-top:10px;">Ajustes de caja aprobados en este período: <b style="color:${t.ajustes>=0?'var(--sage)':'var(--red)'};">${t.ajustes>0?'+':''}${fmtMoney(t.ajustes)}</b> (diferencias de efectivo, no son gasto ni ingreso).</div>` : ''}
         <div class="section-hint" style="margin-top:10px;">Hay ${fmtMoney(t.internoOut)} en transferencias entre cajas y préstamos entre socios que no cuentan como gasto ni como ingreso.</div>
       </div>
     </div>
@@ -5316,6 +5420,7 @@ function gxVistaCajas(libro){
     </div>`;
   }).join('');
   return `
+    <div style="margin-bottom:10px;"><button class="btn small" data-gx-arq>Hacer un arqueo (contar el efectivo)</button></div>
     <div class="section-hint" style="margin-bottom:12px;">Cada caja con todo lo que entró y salió de ella, y cómo fue cambiando su saldo. ${control.diff===0?'<span style="color:var(--sage);">✔ Coincide con el saldo de las cajas.</span>':'<span style="color:var(--red);">✖ No coincide con el saldo de las cajas.</span>'}</div>
     ${bloques}`;
 }
@@ -5546,11 +5651,206 @@ function bindGastosUI(){
     pushLog(adminUnlocked.nombre, 'Marcado como revisado', k.split('|')[0]);
     saveState(); renderPanel(); }));
   panel.querySelectorAll('[data-gx-reabrir]').forEach(b=>b.addEventListener('click', ()=>{ if(state.revisados) delete state.revisados[b.dataset.gxReabrir]; saveState(); renderPanel(); }));
+  panel.querySelectorAll('[data-gx-arq]').forEach(b=>b.addEventListener('click', ()=>{ currentTab='arqueos'; render(); }));
   panel.querySelectorAll('[data-gx-evento]').forEach(b=>b.addEventListener('click', ()=>{ currentTab='eventos'; render(); }));
   panel.querySelectorAll('[data-gx-aceptar]').forEach(b=>b.addEventListener('click', gxAceptarSeguras));
   panel.querySelectorAll('[data-gx-limpiar]').forEach(b=>b.addEventListener('click', ()=>{ gxF = {mes:'', caja:'', tipo:'', grupo:'', cat:'', evento:'', admin:'', texto:''}; gxLimite = 120; renderPanel(); }));
   panel.querySelectorAll('[data-gx-mas]').forEach(b=>b.addEventListener('click', ()=>{ gxLimite += 200; renderPanel(); }));
   panel.querySelectorAll('[data-gx-csv]').forEach(b=>b.addEventListener('click', ()=>gxExportarCSV(gxAplicarFiltros(gxLibro()))));
+}
+
+// ================= ARQUEOS Y AJUSTES DE CAJA =================
+// Arqueo: el dueño de la caja cuenta el efectivo real y se compara con el saldo del sistema. No modifica nada.
+// Ajuste: corrige una diferencia. Queda pendiente hasta que OTRO administrador lo apruebe con su PIN. Nada se borra.
+const ARQ_DIAS = 7;
+
+function arqUltimo(cajaId){ return (state.arqueos||[]).filter(a=>a.cajaId===cajaId).sort((a,b)=>(b.ts||0)-(a.ts||0))[0] || null; }
+function arqEstado(caja){
+  const u = arqUltimo(caja.id);
+  if(!u) return {tipo:'nunca', dias:null, u:null};
+  const d = gxDias(todayStr(), u.fecha);
+  return {tipo: d>ARQ_DIAS ? 'atrasado' : 'aldia', dias:d, u};
+}
+function arqConteo(){
+  const aj = (state.ajustesCaja||[]).filter(a=>a.estado==='pendiente').length;
+  const atras = (state.cajas||[]).filter(c=>arqEstado(c).tipo!=='aldia').length;
+  return {aj, atras};
+}
+function arqBadge(){ try{ const p = arqConteo(); const n = p.aj + p.atras; return n ? ' ('+n+')' : ''; }catch(e){ return ''; } }
+function arqPuedeResolver(a){
+  if(!adminUnlocked) return 'Ingresá como administrador.';
+  const caja = (state.cajas||[]).find(c=>c.id===a.cajaId);
+  if(a.solicitanteId===adminUnlocked.id) return 'No podés aprobar un ajuste que pediste vos.';
+  if(caja && caja.administradorId===adminUnlocked.id) return 'No podés aprobar un ajuste de tu propia caja.';
+  return '';
+}
+function arqDifTxt(d){ return d===0 ? 'Cuadra' : (d>0 ? 'Sobra '+fmtMoney(d) : 'Falta '+fmtMoney(-d)); }
+function arqDifColor(d){ return d===0 ? 'var(--sage)' : 'var(--red)'; }
+
+// ---------- pantalla ----------
+function renderArqueos(){
+  const cajas = state.cajas || [];
+  const ajustes = [...(state.ajustesCaja||[])].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const pend = ajustes.filter(a=>a.estado==='pendiente');
+  const resueltos = ajustes.filter(a=>a.estado!=='pendiente');
+  const arqueos = [...(state.arqueos||[])].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const cards = cajas.map(c=>{
+    const e = arqEstado(c); const saldo = saldoCaja(c.id); const u = e.u;
+    const badge = e.tipo==='nunca' ? '<span class="gx-alerta">Sin arqueos todavía</span>' : (e.tipo==='atrasado' ? `<span class="gx-alerta">Atrasado: hace ${e.dias} días</span>` : `<span class="gx-ok">Al día (hace ${e.dias} d.)</span>`);
+    return `<div class="card">
+      <div class="row-between" style="margin-bottom:8px;"><div><h3 class="gx-h" style="margin:0;">${gxEsc(c.nombre)}</h3><div class="section-hint">Caja de ${gxEsc(c.administradorId?gxAdminNombre(c.administradorId):'sin dueño')}</div></div>${badge}</div>
+      <div class="gx-cuenta" style="grid-template-columns:repeat(3,1fr);">
+        <div><small>Saldo según el sistema</small><span class="mono">${fmtMoney(saldo)}</span></div>
+        <div><small>Último conteo</small><span class="mono">${u?fmtMoney(u.contado):'—'}</span></div>
+        <div><small>Resultado del último conteo</small><span class="mono" style="color:${u?arqDifColor(u.diferencia):'inherit'};">${u?arqDifTxt(u.diferencia):'—'}</span></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+        <button class="btn small" data-arq-nuevo="${c.id}">Hacer arqueo</button>
+        <button class="btn small ghost" data-arq-ajuste="${c.id}">Pedir un ajuste</button>
+      </div></div>`;
+  }).join('');
+  const filaAj = a=>{
+    const c = cajas.find(x=>x.id===a.cajaId); const why = a.estado==='pendiente' ? arqPuedeResolver(a) : '';
+    const est = a.estado==='aprobado' ? '<span class="gx-ok">Aprobado</span>' : (a.estado==='rechazado' ? '<span class="gx-alerta">Rechazado</span>' : '<span style="color:var(--gold);">Pendiente</span>');
+    return `<tr>
+      <td style="white-space:nowrap;">${fmtDate(a.fecha)}</td>
+      <td>${gxEsc(c?c.nombre:'(caja eliminada)')}</td>
+      <td>${a.tipo==='ingreso'?'Sobrante (suma)':'Faltante (resta)'}</td>
+      <td class="mono" style="text-align:right;color:${a.tipo==='ingreso'?'var(--sage)':'var(--red)'};">${a.tipo==='ingreso'?'+':'-'}${fmtMoney(a.monto)}</td>
+      <td style="max-width:280px;">${gxEsc(a.motivo||'')}<div class="section-hint">Pidió ${gxEsc(gxAdminNombre(a.solicitanteId))}${a.estado!=='pendiente'?` · ${a.estado==='aprobado'?'aprobó':'rechazó'} ${gxEsc(gxAdminNombre(a.resolvioId))}${a.notaResolucion?' — '+gxEsc(a.notaResolucion):''}`:''}</div></td>
+      <td>${est}</td>
+      <td>${a.estado==='pendiente' ? (why ? `<div class="section-hint" style="max-width:190px;">${gxEsc(why)}</div>` : `<button class="btn small" data-aj-aprobar="${a.id}">Aprobar</button> <button class="btn small ghost" data-aj-rechazar="${a.id}">Rechazar</button>`) : ''}</td></tr>`;
+  };
+  return `
+    <div class="row-between">
+      <div><h2 class="section-title">Arqueos y ajustes de caja</h2>
+      <div class="section-hint">Una vez por semana, cada administrador cuenta el efectivo de su caja y lo compara con el sistema. Si no coincide, se pide un ajuste que tiene que aprobar otro administrador. Nada se borra: queda todo registrado.</div></div>
+      <button class="btn" data-arq-nuevo="">+ Hacer arqueo</button>
+    </div>
+    <div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(300px,1fr));">${cards || '<div class="empty">Todavía no hay cajas.</div>'}</div>
+    <div class="card"><h3 class="gx-h">Ajustes pendientes de aprobación ${pend.length?`<span class="gx-count">${pend.length}</span>`:''}</h3>
+      ${pend.length===0 ? '<div class="section-hint">No hay ajustes pendientes.</div>' : `<div style="overflow-x:auto;"><table class="gx-tabla"><thead><tr><th>Fecha</th><th>Caja</th><th>Tipo</th><th style="text-align:right;">Monto</th><th>Motivo</th><th>Estado</th><th></th></tr></thead><tbody>${pend.map(filaAj).join('')}</tbody></table></div>`}
+    </div>
+    <div class="card"><h3 class="gx-h">Historial de arqueos</h3>
+      ${arqueos.length===0 ? '<div class="section-hint">Todavía no se hizo ningún arqueo.</div>' : `<div style="overflow-x:auto;"><table class="gx-tabla"><thead><tr><th>Fecha</th><th>Caja</th><th style="text-align:right;">Contó</th><th style="text-align:right;">Sistema</th><th>Resultado</th><th>Contó / testigo</th><th>Nota</th></tr></thead><tbody>
+      ${arqueos.slice(0,40).map(a=>{ const c = cajas.find(x=>x.id===a.cajaId); return `<tr><td style="white-space:nowrap;">${fmtDate(a.fecha)}</td><td>${gxEsc(c?c.nombre:'(caja eliminada)')}</td><td class="mono" style="text-align:right;">${fmtMoney(a.contado)}</td><td class="mono" style="text-align:right;">${fmtMoney(a.saldoSistema)}</td><td style="color:${arqDifColor(a.diferencia)};">${arqDifTxt(a.diferencia)}</td><td>${gxEsc(gxAdminNombre(a.adminId))}${a.testigoId?' / '+gxEsc(gxAdminNombre(a.testigoId)):''}</td><td style="max-width:260px;">${gxEsc(a.nota||'')}</td></tr>`; }).join('')}
+      </tbody></table></div>`}
+    </div>
+    ${resueltos.length ? `<div class="card"><h3 class="gx-h">Ajustes resueltos</h3><div style="overflow-x:auto;"><table class="gx-tabla"><thead><tr><th>Fecha</th><th>Caja</th><th>Tipo</th><th style="text-align:right;">Monto</th><th>Motivo</th><th>Estado</th><th></th></tr></thead><tbody>${resueltos.map(filaAj).join('')}</tbody></table></div></div>` : ''}
+  `;
+}
+
+// ---------- formularios ----------
+function arqCajaOpts(sel){ return (state.cajas||[]).map(c=>`<option value="${c.id}" ${sel===c.id?'selected':''}>${gxEsc(c.nombre)}</option>`).join(''); }
+function arqCajaSugerida(){ const c = (state.cajas||[]).find(x=>x.administradorId===(adminUnlocked&&adminUnlocked.id)); return c ? c.id : ((state.cajas||[])[0]||{}).id; }
+
+function openArqueoModal(cajaId){
+  const sel = cajaId || arqCajaSugerida();
+  modalContent = {
+    title: 'Arqueo de caja',
+    bodyHtml: `
+      <div class="section-hint" style="margin-bottom:12px;">Contá el efectivo que hay realmente en la caja, billete por billete, y escribí el total. No mires el saldo del sistema antes: se compara después.</div>
+      <div class="field-row">
+        <div class="field"><label>Caja</label><select name="cajaId" id="arqCaja">${arqCajaOpts(sel)}</select></div>
+        <div class="field"><label>Fecha del conteo</label><input type="date" name="fecha" value="${todayStr()}"></div>
+      </div>
+      <div class="field"><label>Efectivo contado (Gs.)</label><input type="text" inputmode="decimal" class="input-monto" name="contado" id="arqContado" placeholder="Total contado"></div>
+      <div class="field"><label>Testigo (otro administrador que presenció el conteo, opcional)</label>
+        <select name="testigoId"><option value="">— Sin testigo —</option>${(state.admins||[]).filter(a=>!adminUnlocked||a.id!==adminUnlocked.id).map(a=>`<option value="${a.id}">${gxEsc(a.nombre)}</option>`).join('')}</select></div>
+      <div id="arqPreview" class="card tight" style="display:none;"></div>
+      <div class="field"><label>Nota (obligatoria si hay diferencia)</label><textarea name="nota" placeholder="Ej: faltan dos compras que todavía no cargué; se cargaron cobros en efectivo del sábado…"></textarea></div>`,
+    afterRender: (el)=>{
+      const prev = el.querySelector('#arqPreview'), caja = el.querySelector('#arqCaja'), cont = el.querySelector('#arqContado');
+      const upd = ()=>{
+        if(!cont.value.trim()){ prev.style.display='none'; return; }
+        const sis = saldoCaja(caja.value), dif = (parseMonto(cont.value)||0) - sis;
+        prev.style.display=''; prev.innerHTML = `<div class="gx-cuenta" style="grid-template-columns:repeat(3,1fr);"><div><small>Sistema dice</small><span class="mono">${fmtMoney(sis)}</span></div><div><small>Contaste</small><span class="mono">${fmtMoney(parseMonto(cont.value)||0)}</span></div><div><small>Resultado</small><span class="mono" style="color:${arqDifColor(dif)};">${arqDifTxt(dif)}</span></div></div>`;
+      };
+      cont.addEventListener('input', upd); caja.addEventListener('change', upd);
+    },
+    onSave: (form)=>{
+      const c = (state.cajas||[]).find(x=>x.id===form.cajaId.value);
+      if(!c) return avisarError('Elegí la caja.');
+      if(!form.contado.value.trim()) return avisarError('Escribí el efectivo que contaste (puede ser 0).');
+      if(!form.fecha.value) return avisarError('Elegí la fecha del conteo.');
+      const contado = parseMonto(form.contado.value) || 0;
+      const sis = saldoCaja(c.id), dif = contado - sis;
+      const nota = form.nota.value.trim();
+      if(dif!==0 && nota.length<5) return avisarError('Hay diferencia: contá en la nota qué puede haber pasado.');
+      if((state.arqueos||[]).some(a=>a.cajaId===c.id && a.fecha===form.fecha.value && a.contado===contado && a.saldoSistema===sis)) return avisarDuplicado('un arqueo');
+      const arq = {id:uid(), cajaId:c.id, fecha:form.fecha.value, ts:Date.now(), adminId:adminUnlocked.id, testigoId:form.testigoId.value||'', contado, saldoSistema:sis, diferencia:dif, nota};
+      state.arqueos = state.arqueos || []; state.arqueos.push(arq);
+      pushLog(adminUnlocked.nombre, 'Arqueo de caja', `${c.nombre}: contó ${fmtMoney(contado)}, sistema ${fmtMoney(sis)} → ${arqDifTxt(dif)}`);
+      saveState(); closeModal();
+      if(dif!==0 && confirm(`La caja "${c.nombre}" ${dif>0?'tiene de más':'tiene de menos'} ${fmtMoney(Math.abs(dif))}.\n\n¿Querés pedir ahora el ajuste? Otro administrador tiene que aprobarlo. Si preferís primero revisar los movimientos, podés pedirlo después.`)){ openAjusteModal(c.id, arq.id); }
+      else render();
+    },
+  };
+  render();
+}
+
+function openAjusteModal(cajaId, arqueoId){
+  const arq = arqueoId ? (state.arqueos||[]).find(a=>a.id===arqueoId) : null;
+  const sel = cajaId || (arq && arq.cajaId) || arqCajaSugerida();
+  const tipo0 = arq ? (arq.diferencia>0 ? 'ingreso' : 'egreso') : 'egreso';
+  const monto0 = arq ? Math.abs(arq.diferencia) : '';
+  modalContent = {
+    title: 'Pedir ajuste de caja',
+    bodyHtml: `
+      <div class="section-hint" style="margin-bottom:12px;">El ajuste <b>no cambia el saldo</b> hasta que otro administrador lo apruebe con su PIN. Usalo solo cuando ya revisaste los movimientos y la diferencia no se puede explicar cargando algo que faltó.</div>
+      ${arq?`<div class="card tight" style="margin-bottom:12px;">Arqueo del ${fmtDate(arq.fecha)}: contó ${fmtMoney(arq.contado)}, el sistema decía ${fmtMoney(arq.saldoSistema)} (${arqDifTxt(arq.diferencia)}).</div>`:''}
+      <div class="field-row">
+        <div class="field"><label>Caja</label><select name="cajaId">${arqCajaOpts(sel)}</select></div>
+        <div class="field"><label>Tipo</label><select name="tipo"><option value="egreso" ${tipo0==='egreso'?'selected':''}>Faltante — la caja tiene menos (resta)</option><option value="ingreso" ${tipo0==='ingreso'?'selected':''}>Sobrante — la caja tiene más (suma)</option></select></div>
+      </div>
+      <div class="field"><label>Monto del ajuste (Gs.)</label><input type="text" inputmode="decimal" class="input-monto" name="monto" value="${monto0?Number(monto0).toLocaleString('es-PY'):''}"></div>
+      <div class="field"><label>Motivo (qué pasó y qué revisaste)</label><textarea name="motivo" placeholder="Ej: diferencia sin explicar después de revisar el extracto de la caja con el administrador"></textarea></div>`,
+    onSave: (form)=>{
+      const c = (state.cajas||[]).find(x=>x.id===form.cajaId.value);
+      const monto = parseMonto(form.monto.value);
+      const motivo = form.motivo.value.trim();
+      if(!c) return avisarError('Elegí la caja.');
+      if(!(monto>0)) return avisarError('Ingresá un monto mayor a cero.');
+      if(motivo.length<10) return avisarError('Explicá el motivo con algo más de detalle (qué pasó y qué revisaste).');
+      if((state.ajustesCaja||[]).some(a=>a.estado==='pendiente' && a.cajaId===c.id && a.tipo===form.tipo.value && a.monto===monto)) return avisarDuplicado('un ajuste');
+      const aj = {id:uid(), cajaId:c.id, tipo:form.tipo.value, monto, fecha:(arq?arq.fecha:todayStr()), ts:Date.now(), motivo, solicitanteId:adminUnlocked.id, arqueoId:arq?arq.id:'', estado:'pendiente'};
+      state.ajustesCaja = state.ajustesCaja || []; state.ajustesCaja.push(aj);
+      pushLog(adminUnlocked.nombre, 'Ajuste de caja solicitado', `${c.nombre}: ${aj.tipo==='ingreso'?'+':'-'}${fmtMoney(monto)} — ${motivo.slice(0,80)}`);
+      saveState(); closeModal(); currentTab = 'arqueos'; render();
+    },
+  };
+  render();
+}
+
+function arqResolver(id, aprobar){
+  const a = (state.ajustesCaja||[]).find(x=>x.id===id);
+  if(!a || a.estado!=='pendiente') return;
+  const why = arqPuedeResolver(a); if(why) return alert(why);
+  const c = (state.cajas||[]).find(x=>x.id===a.cajaId);
+  if(aprobar){
+    const antes = saldoCaja(a.cajaId), despues = antes + (a.tipo==='ingreso'?1:-1)*a.monto;
+    if(!confirm(`Vas a ${a.tipo==='ingreso'?'SUMAR':'RESTAR'} ${fmtMoney(a.monto)} a la caja "${c?c.nombre:''}".\nSaldo: ${fmtMoney(antes)} → ${fmtMoney(despues)}.\n\nMotivo: ${a.motivo}\n\n¿Aprobar?`)) return;
+    const admin = (state.admins||[]).find(x=>x.id===adminUnlocked.id);
+    const pin = prompt('Para aprobar, ingresá tu PIN:');
+    if(pin===null) return;
+    if(!admin || String(admin.pin).trim()!==String(pin).trim()) return alert('PIN incorrecto. No se aprobó el ajuste.');
+    a.estado = 'aprobado'; a.resolvioId = adminUnlocked.id; a.fechaResolucion = Date.now();
+    pushLog(adminUnlocked.nombre, 'Ajuste de caja APROBADO', `${c?c.nombre:''}: ${a.tipo==='ingreso'?'+':'-'}${fmtMoney(a.monto)} (pedido por ${gxAdminNombre(a.solicitanteId)})`);
+  } else {
+    const nota = prompt('¿Por qué lo rechazás? (opcional)', '');
+    if(nota===null) return;
+    a.estado = 'rechazado'; a.resolvioId = adminUnlocked.id; a.fechaResolucion = Date.now(); a.notaResolucion = (nota||'').trim();
+    pushLog(adminUnlocked.nombre, 'Ajuste de caja rechazado', `${c?c.nombre:''}: ${fmtMoney(a.monto)}`);
+  }
+  saveState(); render();
+}
+
+function bindArqueosUI(){
+  const panel = document.getElementById('panel'); if(!panel) return;
+  panel.querySelectorAll('[data-arq-nuevo]').forEach(b=>b.addEventListener('click', ()=>openArqueoModal(b.dataset.arqNuevo||'')));
+  panel.querySelectorAll('[data-arq-ajuste]').forEach(b=>b.addEventListener('click', ()=>openAjusteModal(b.dataset.arqAjuste, '')));
+  panel.querySelectorAll('[data-aj-aprobar]').forEach(b=>b.addEventListener('click', ()=>arqResolver(b.dataset.ajAprobar, true)));
+  panel.querySelectorAll('[data-aj-rechazar]').forEach(b=>b.addEventListener('click', ()=>arqResolver(b.dataset.ajRechazar, false)));
 }
 
 function gastoFormFields(g){
@@ -6964,6 +7264,7 @@ function bindPanelEvents(){
   const panel = document.getElementById('panel');
   bindArmarEventos();
   if(currentTab==='gastos' || currentTab==='revisar') bindGastosUI();
+  if(currentTab==='arqueos') bindArqueosUI();
 
   // calendario nav
   const prev = document.getElementById('calPrev');
@@ -7178,7 +7479,7 @@ function bindPanelEvents(){
       tiposEvento: state.tiposEvento,
       gastosPersonal: state.gastosPersonal, colaboradoresLimitados: state.colaboradoresLimitados,
       cargosAdicionales: state.cargosAdicionales, transferenciasCaja: state.transferenciasCaja, rolesExtra: state.rolesExtra, ultimoArchivadoTs: state.ultimoArchivadoTs, kits: state.kits, prestamos: state.prestamos,
-      prestamosAdmin: state.prestamosAdmin, revisados: state.revisados || {},
+      prestamosAdmin: state.prestamosAdmin, revisados: state.revisados || {}, arqueos: state.arqueos || [], ajustesCaja: state.ajustesCaja || [],
     }, null, 2);
     const blob = new Blob([data], {type:'application/json'});
     const url = URL.createObjectURL(blob);
@@ -7222,7 +7523,7 @@ function bindPanelEvents(){
         state.ultimoArchivadoTs = parsed.ultimoArchivadoTs || 0;
         state.kits = parsed.kits || [];
         state.prestamos = parsed.prestamos || [];
-        state.prestamosAdmin = parsed.prestamosAdmin || []; state.revisados = parsed.revisados || {};
+        state.prestamosAdmin = parsed.prestamosAdmin || []; state.revisados = parsed.revisados || {}; state.arqueos = parsed.arqueos || []; state.ajustesCaja = parsed.ajustesCaja || [];
         if(parsed.admins && parsed.admins.length) state.admins = parsed.admins;
         if(parsed.log && parsed.log.length) state.log = parsed.log;
         pushLog(adminUnlocked.nombre, 'Importó copia de seguridad completa', file.name);
