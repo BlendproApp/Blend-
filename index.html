@@ -787,6 +787,24 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   .gx-pill b{ color:var(--cream); margin-left:2px; }
   .gx-pill.on{ background:var(--copper); color:#fff; border-color:var(--copper); }
   .gx-pill.on b{ color:#fff; }
+  a.btn{ display:inline-block; text-decoration:none; background:var(--copper); color:var(--accent-ink,#fff); border-radius:8px; font-weight:600; padding:8px 14px; font-size:0.85rem; }
+  a.btn.ghost{ background:var(--ink-2); color:var(--cream); border:1px solid var(--line); }
+  a.btn.small{ padding:5px 10px; font-size:0.78rem; }
+  .badge.ev-proximo{ background:color-mix(in srgb, var(--sage) 22%, transparent); color:var(--sage); }
+  .badge.ev-posible{ background:color-mix(in srgb, var(--copper) 20%, transparent); color:var(--copper-bright); }
+  .badge.ev-pasado{ background:color-mix(in srgb, var(--gold) 22%, transparent); color:var(--gold); }
+  .badge.ev-cerrado{ background:color-mix(in srgb, var(--cream-dim) 18%, transparent); color:var(--cream-dim); }
+  .badge.ev-vencido{ background:color-mix(in srgb, var(--red) 18%, transparent); color:var(--red); }
+  .badge.ev-pronto{ background:var(--copper); color:var(--accent-ink,#fff); }
+  .badge.perdido{ background:color-mix(in srgb, var(--cream-dim) 22%, transparent); color:var(--cream-dim); }
+  .badge.ev-perdido{ background:color-mix(in srgb, var(--cream-dim) 22%, transparent); color:var(--cream-dim); }
+  .sem-row{ display:flex; flex-wrap:wrap; gap:4px 10px; margin-top:5px; }
+  .sem-i{ display:inline-flex; align-items:center; gap:4px; font-size:0.72rem; color:var(--cream-dim); }
+  .sem{ display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--cream-dim); }
+  .sem.s-ok{ background:var(--sage); } .sem.s-aviso{ background:var(--gold); } .sem.s-mal{ background:var(--red); } .sem.s-nd{ background:transparent; border:1px solid var(--cream-dim); }
+  .qh-fila{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
+  .qh-acc{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+
 </style>
 </head>
 <body>
@@ -889,7 +907,7 @@ new MutationObserver(()=>{
 }).observe(document.body, {childList:true, subtree:true});
 document.addEventListener('click', function(e){
   const el = e.target.closest('[data-goto-tab]');
-  if(el){ currentTab = el.dataset.gotoTab; render(); }
+  if(el){ currentTab = el.dataset.gotoTab; if(el.dataset.gotoEvfiltro) evFiltro = el.dataset.gotoEvfiltro; render(); }
   const pdfBtn = e.target.closest('[data-descargar-pdf-insumos]');
   if(pdfBtn){
     const ev = state.eventos.find(x=>x.id===pdfBtn.dataset.descargarPdfInsumos);
@@ -1370,6 +1388,213 @@ function saldoPendienteEvento(ev){
   const base = ev.pagadoTotal ? 0 : (Number(ev.montoTotal)||0) - cobradoEvento(ev.id);
   return base + cargosAdicionalesPendientesEvento(ev.id);
 }
+
+// ================= CLASIFICACIÓN DE EVENTOS =================
+// Se calcula al mostrar (no se guarda): cambia sola con la fecha y con los cobros y pagos.
+//  proximo  = reservado, todavía no ocurrió
+//  posible  = no confirmado, fecha futura o sin fecha
+//  pasado   = reservado, ya ocurrió, pero falta cobrar al cliente, pagar al personal o la comisión del planner
+//  cerrado  = reservado, ya ocurrió y no queda nada pendiente
+//  vencido  = era posible y la fecha ya pasó sin reservarse
+const EV_CLASES = {
+  proximo:['Próximos','Reservados que todavía no ocurrieron'],
+  posible:['Posibles','Todavía no confirmados'],
+  pasado:['Pasados por cerrar','Ya ocurrieron pero falta cobrar o pagar algo'],
+  cerrado:['Cerrados','Ya ocurrieron y no queda nada pendiente'],
+  vencido:['Posibles vencidos','Eran posibles y la fecha pasó sin reservarse'],
+  perdido:['Perdidos','Se descartaron: el cliente no siguió, eligió a otro, etc.'],
+};
+const EV_CLASES_ORDEN = ['proximo','posible','pasado','cerrado','vencido','perdido'];
+let evFiltro = 'proximo';
+function clasificarEvento(ev){
+  const hoy = todayStr(), f = ev.fecha || '';
+  if(ev.estado==='perdido') return 'perdido';
+  if(ev.estado==='posible') return (f && f<hoy) ? 'vencido' : 'posible';
+  if(f && f<hoy) return estadoCicloEvento(ev).cerrado ? 'cerrado' : 'pasado';
+  return 'proximo';
+}
+function diasHastaEvento(f){ if(!f) return null; return Math.round((new Date(f+'T00:00:00') - new Date(todayStr()+'T00:00:00'))/86400000); }
+function textoDiasEvento(f){
+  const d = diasHastaEvento(f); if(d===null) return 'sin fecha';
+  if(d===0) return 'hoy'; if(d===1) return 'mañana'; if(d===-1) return 'ayer';
+  return d>0 ? 'en '+d+' días' : 'hace '+(-d)+' días';
+}
+function eventosPendientesCobro(){
+  return state.eventos.filter(e=>e.estado==='reservado').map(ev=>({ev, saldo:saldoPendienteEvento(ev), cobrado:cobradoEvento(ev.id), adicional:cargosAdicionalesPendientesEvento(ev.id)})).filter(x=>x.saldo>0);
+}
+function eventosPagadosSinCobro(){
+  return state.eventos.filter(e=>e.estado==='reservado' && e.pagadoTotal && (Number(e.montoTotal)||0)>0 && cobradoEvento(e.id) < (Number(e.montoTotal)||0)*0.999);
+}
+
+// ================= PENDIENTES / QUÉ HACER =================
+const MOTIVOS_PERDIDO = ['Eligió a otra barra','Le pareció caro','No respondió más','Canceló el evento','Cambió de fecha y no tenemos disponibilidad','Otro'];
+const MOTIVOS_SIN_SENA = ['Cliente de confianza (paga a la entrega)','Evento corporativo (se factura)','Pago posterior acordado','Otro'];
+function nombreEvento(ev){
+  if(!ev) return '(evento eliminado)';
+  const c = (ev.cliente||'').trim(), l = (ev.lugar||'').trim();
+  if(c && l) return c+' — '+l;
+  return c || l || '(sin nombre)';
+}
+function addDias(f, n){
+  const d = new Date(f+'T00:00:00'); d.setDate(d.getDate()+n);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+// el saldo vence 7 días antes del evento, salvo que se haya fijado otra fecha
+function saldoVenceEvento(ev){ return ev.saldoVence || (ev.fecha ? addDias(ev.fecha,-7) : ''); }
+function waTel(t){
+  let n = String(t||'').replace(/\D/g,''); if(!n) return '';
+  if(n.startsWith('00')) n = n.slice(2);
+  if(n.startsWith('0')) n = '595'+n.slice(1);
+  return n;
+}
+function waClienteLink(ev, texto){ return 'https://wa.me/'+waTel(ev.clienteTelefono)+'?text='+encodeURIComponent(texto); }
+function waClienteSaldo(ev){
+  const saldo = saldoPendienteEvento(ev);
+  const v = saldoVenceEvento(ev);
+  const txt = `Hola${ev.cliente?' '+ev.cliente:''}! Te escribimos de Blend Coctelería. Te recordamos que el saldo de tu evento del ${fmtDate(ev.fecha)} (${fmtMoney(saldo)}) vence el ${fmtDate(v)}. Cualquier duda, avisanos. ¡Gracias!`;
+  return waClienteLink(ev, txt);
+}
+function waClienteSeguimiento(ev){
+  const txt = `Hola${ev.cliente?' '+ev.cliente:''}! Te escribimos de Blend Coctelería para saber cómo seguís con tu evento del ${fmtDate(ev.fecha)}. ¿Querés que lo reservemos? Quedamos atentos.`;
+  return waClienteLink(ev, txt);
+}
+function senaSugeridaEvento(ev){
+  const tot = Number(ev.montoTotal)||0, s = Number(ev.senaPercent)||0;
+  if(tot<=0) return 0;
+  if(s>0 && s<=100) return Math.round(tot*s/100);
+  if(s>100) return s;
+  return Math.round(tot*0.5);
+}
+function semaforoEvento(ev){
+  if(ev.estado!=='reservado') return '';
+  const hoy = todayStr(), pasado = !!(ev.fecha && ev.fecha<hoy);
+  const c = estadoCicloEvento(ev);
+  const saldo = saldoPendienteEvento(ev), v = saldoVenceEvento(ev);
+  const cobroVencido = saldo>0 && (pasado || (v && v<hoy));
+  const hayPersonal = state.produccion.some(r=>r.eventoId===ev.id);
+  const lista = [
+    saldo<=0 ? ['ok','Cobro','Cobrado por completo'] : (cobroVencido ? ['mal','Cobro','Saldo vencido: '+fmtMoney(saldo)] : ['aviso','Cobro','Falta cobrar '+fmtMoney(saldo)+(v?' (vence '+fmtDate(v)+')':'')]),
+    !hayPersonal ? ['nd','Personal','Sin personal asignado'] : (c.personalPagado ? ['ok','Personal','Personal pagado'] : (pasado ? ['mal','Personal','Personal sin pagar'] : ['aviso','Personal','Personal por pagar después del evento'])),
+  ];
+  if(c.tienePlanner) lista.push(c.comisionPagada ? ['ok','Comisión','Comisión del planner pagada'] : (pasado ? ['mal','Comisión','Comisión del planner sin pagar'] : ['aviso','Comisión','Comisión del planner pendiente']));
+  return `<div class="sem-row">${lista.map(x=>`<span class="sem-i" title="${gxEsc(x[2])}"><i class="sem s-${x[0]}"></i>${x[1]}</span>`).join('')}</div>`;
+}
+function quehacerItems(){
+  const hoy = todayStr(), out = [];
+  const add = (nivel, tipo, ev, titulo, detalle, acciones, fecha)=>out.push({nivel, tipo, ev, titulo, detalle, acciones, fecha: fecha||(ev&&ev.fecha)||'9999'});
+  const btnAbrir = ev=>`<button class="btn small ghost" data-open-evento="${ev.id}">Ver evento</button>`;
+  const btnWa = (ev, link, txt)=> ev.clienteTelefono ? `<a class="btn small ghost" href="${link}" target="_blank" rel="noopener">${txt}</a>` : '';
+  state.eventos.forEach(ev=>{
+    const d = diasHastaEvento(ev.fecha);
+    if(ev.estado==='reservado'){
+      const saldo = saldoPendienteEvento(ev), cob = cobradoEvento(ev.id), tot = Number(ev.montoTotal)||0;
+      const pasado = !!(ev.fecha && ev.fecha<hoy);
+      const v = saldoVenceEvento(ev), dv = v ? diasHastaEvento(v) : null;
+      const nombre = nombreEvento(ev);
+      if(!pasado && !ev.pagadoTotal && cob<=0 && tot>0 && !ev.sinSenaMotivo){
+        add(d!==null && d<=30 ? 'urgente':'semana','sena',ev,'Cobrar la seña — '+nombre,
+          `Reservado sin seña cobrada · evento ${textoDiasEvento(ev.fecha)} · precio ${fmtMoney(tot)}`,
+          `<button class="btn small" data-cobrar-evento="${ev.id}" data-pre-monto="${senaSugeridaEvento(ev)}">Cobrar seña</button>${btnAbrir(ev)}${btnWa(ev, waClienteSaldo(ev), 'WhatsApp')}`);
+      } else if(saldo>0){
+        const nivel = (pasado || (dv!==null && dv<0)) ? 'urgente' : (dv!==null && dv<=7 ? 'semana' : 'tener');
+        const venceTxt = v ? (dv<0 ? 'venció '+textoDiasEvento(v) : 'vence '+textoDiasEvento(v)+' ('+fmtDate(v)+')') : '';
+        add(nivel,'saldo',ev,'Cobrar saldo — '+nombre,
+          `Falta ${fmtMoney(saldo)} de ${fmtMoney(tot)}${pasado?' · el evento ya fue '+textoDiasEvento(ev.fecha):(venceTxt?' · '+venceTxt:'')}`,
+          `<button class="btn small" data-cobrar-evento="${ev.id}">Registrar cobro</button>${btnWa(ev, waClienteSaldo(ev), 'Recordar por WhatsApp')}${btnAbrir(ev)}`, pasado?ev.fecha:(v||ev.fecha));
+      }
+      if(ev.fecha && ev.fecha<=hoy){
+        const pend = state.produccion.filter(r=>r.eventoId===ev.id && !r.pagado);
+        if(pend.length){
+          const tot2 = pend.reduce((s,r)=>s+(totalRegistro(r)||0),0);
+          add(-d>=3?'urgente':'semana','personal',ev,'Pagar al personal — '+nombre,
+            `${pend.length} registro${pend.length===1?'':'s'} sin pagar · ${fmtMoney(tot2)} · el evento fue ${textoDiasEvento(ev.fecha)}`,
+            `<button class="btn small" data-goto-tab="pagos">Ir a Pagos de Personal</button>${btnAbrir(ev)}`);
+        }
+        const c = estadoCicloEvento(ev);
+        if(c.tienePlanner && !c.comisionPagada){
+          const monto = Math.round(tot*Number(ev.comisionPlannerPercent)/100);
+          add(-d>=7?'urgente':'semana','comision',ev,'Pagar comisión al planner — '+nombre,
+            `${ev.planner} · ${ev.comisionPlannerPercent}% = ${fmtMoney(monto)} · el evento fue ${textoDiasEvento(ev.fecha)}`,
+            `<button class="btn small" data-comision-pagada="${ev.id}">Marcar como pagada</button>${btnAbrir(ev)}`);
+        }
+      }
+    } else if(ev.estado==='posible' && ev.fecha && ev.fecha>=hoy){
+      const nivel = d<=7 ? 'urgente' : (d<=21 ? 'semana' : 'tener');
+      add(nivel,'posible',ev,'Confirmar o descartar — '+nombreEvento(ev),
+        `Posible · evento ${textoDiasEvento(ev.fecha)} (${fmtDate(ev.fecha)})${ev.montoTotal?' · '+fmtMoney(ev.montoTotal):''}`,
+        `<button class="btn small" data-open-evento="${ev.id}">Confirmar / editar</button><button class="btn small ghost" data-perdio="${ev.id}">Se perdió</button>${btnWa(ev, waClienteSeguimiento(ev), 'Hacer seguimiento')}`);
+    }
+  });
+  const venc = state.eventos.filter(e=>clasificarEvento(e)==='vencido');
+  if(venc.length) add('tener','vencidos',null,`${venc.length} posibles con fecha pasada sin resolver`,'Eran posibles y la fecha ya pasó. Marcalos como "Se perdió" con su motivo para limpiar la lista y saber por qué no se concretan.',`<button class="btn small" data-goto-tab="eventos" data-goto-evfiltro="vencido">Revisarlos</button>`,'9999');
+  const reem = (state.gastosPersonal||[]).filter(g=>!g.pagado);
+  if(reem.length) add('semana','reembolsos',null,`${reem.length} reembolso${reem.length===1?'':'s'} pendiente${reem.length===1?'':'s'} al equipo`,`Gastos que el equipo adelantó · total ${fmtMoney(reem.reduce((s,g)=>s+(Number(g.monto)||0),0))}`,`<button class="btn small" data-goto-tab="pagos">Ir a Pagos de Personal</button>`,'9998');
+  const sc = eventosPagadosSinCobro();
+  if(sc.length) add('tener','sincobro',null,`${sc.length} evento${sc.length===1?'':'s'} figuran pagados sin los cobros cargados`,'Tienen la marca "pagado" pero los cobros registrados no llegan al precio: esa plata puede no estar en ninguna caja.',`<button class="btn small" data-goto-tab="pendientecobro">Revisar</button>`,'9997');
+  const orden = {urgente:0, semana:1, tener:2};
+  out.sort((a,b)=>orden[a.nivel]-orden[b.nivel] || String(a.fecha).localeCompare(String(b.fecha)));
+  return out;
+}
+function quehacerResumen(){
+  try{ const l = quehacerItems(); return {urgente:l.filter(x=>x.nivel==='urgente').length, semana:l.filter(x=>x.nivel==='semana').length, tener:l.filter(x=>x.nivel==='tener').length}; }catch(e){ return {urgente:0,semana:0,tener:0}; }
+}
+function renderQueHacer(){
+  const items = quehacerItems();
+  const grupos = [
+    ['urgente','Urgente','Ya venció o es para hoy / esta semana','var(--red)'],
+    ['semana','Esta semana / próximos días','Conviene resolverlo pronto','var(--gold)'],
+    ['tener','Para tener en cuenta','Sin apuro, pero no hay que olvidarlo','var(--cream-dim)'],
+  ];
+  const fila = it=>`<div class="li qh-fila">
+      <div style="min-width:0;"><div class="t">${gxEsc(it.titulo)}</div><div class="d">${gxEsc(it.detalle)}</div></div>
+      <div class="qh-acc">${it.acciones}</div></div>`;
+  return `
+    <div class="row-between">
+      <div><h2 class="section-title">Qué hacer</h2><div class="section-hint">Todo lo pendiente en un solo lugar, ordenado por urgencia: cobrar, pagar al personal, comisiones, reembolsos y posibles por confirmar. Cada línea tiene el botón para resolverla.</div></div>
+    </div>
+    ${items.length===0 ? '<div class="empty">No hay nada pendiente. 🎉</div>' : grupos.map(([k,t,h,c])=>{
+      const l = items.filter(x=>x.nivel===k);
+      if(!l.length) return '';
+      return `<div class="card" style="margin-bottom:14px; border-left:3px solid ${c};">
+        <h3 style="margin:0 0 2px;font-size:1.02rem;">${t} <span class="gx-count">${l.length}</span></h3>
+        <div class="section-hint" style="margin:0 0 8px;">${h}</div>
+        <div class="list-simple">${l.map(fila).join('')}</div></div>`;
+    }).join('')}
+  `;
+}
+function bloqueQueHacerInicio(){
+  const r = quehacerResumen();
+  const tot = r.urgente + r.semana;
+  return `<div class="card clickable" data-goto-tab="quehacer" style="margin-bottom:14px; border-left:3px solid ${r.urgente?'var(--red)':(r.semana?'var(--gold)':'var(--sage)')};">
+    <div class="row-between"><div>
+      <h3 style="margin:0;font-size:1.05rem;">Qué hacer</h3>
+      <div class="section-hint" style="margin:2px 0 0;">${tot===0 ? 'Todo al día. Sin pendientes urgentes.' : (r.urgente?`<b style="color:var(--red);">${r.urgente} urgente${r.urgente===1?'':'s'}</b>`:'')+(r.urgente&&r.semana?' · ':'')+(r.semana?`<b style="color:var(--gold);">${r.semana} esta semana</b>`:'')+(r.tener?` · ${r.tener} para tener en cuenta`:'')}</div>
+    </div><button class="btn small">Ver y resolver</button></div></div>`;
+}
+function openPerdidoModal(id){
+  const ev = eventosDe(id); if(!ev) return;
+  const cob = cobradoEvento(ev.id);
+  const prodPend = state.produccion.filter(r=>r.eventoId===ev.id && !r.pagado).length;
+  modalContent = {
+    title: 'Marcar como perdido',
+    bodyHtml: `
+      <div class="section-hint" style="margin-top:0;"><b>${gxEsc(nombreEvento(ev))}</b> — ${fmtDate(ev.fecha)}</div>
+      ${cob>0?`<div class="gx-aviso card" style="margin:8px 0;"><span>Este evento ya tiene cobros por ${fmtMoney(cob)}. Marcarlo como perdido no los borra: decidí si se devuelven o se retienen y registralo en Cobros / Gastos.</span></div>`:''}
+      ${prodPend?`<div class="gx-aviso card" style="margin:8px 0;"><span>Tiene ${prodPend} registro${prodPend===1?'':'s'} de personal sin pagar generado${prodPend===1?'':'s'} al asignarlo. Revisalos en Producción por si hay que borrarlos.</span></div>`:''}
+      <div class="field"><label>Motivo</label><select name="motivo"><option value="">— Elegí —</option>${MOTIVOS_PERDIDO.map(m=>`<option>${m}</option>`).join('')}</select></div>
+      <div class="field"><label>Nota (opcional)</label><input type="text" name="nota" placeholder="Ej: se fue con otra barra más barata"></div>
+      <div class="section-hint">El evento sale del calendario, de la disponibilidad y de los pendientes, pero queda en "Perdidos" con su motivo. Podés reabrirlo cuando quieras.</div>`,
+    onSave: (form)=>{
+      if(!form.motivo.value) return avisarError('Elegí el motivo.');
+      ev.estado = 'perdido'; ev.perdidoMotivo = form.motivo.value; ev.perdidoNota = form.nota.value.trim(); ev.perdidoFecha = todayStr();
+      pushLog(adminUnlocked.nombre, 'Evento marcado como perdido', `${nombreEvento(ev)} — ${ev.perdidoMotivo}`);
+      saveState(); closeModal(); render();
+    },
+    onDelete: null,
+  };
+  render();
+}
+
 function estadoCicloEvento(ev){
   const personalDelEvento = state.produccion.filter(r=>r.eventoId===ev.id);
   const personalPagado = personalDelEvento.every(r=>r.pagado);
@@ -1440,7 +1665,7 @@ async function archivarDatosViejos(manual){
 }
 function personasEnConflicto(fecha, eventoIdActual){
   // devuelve {personaId: [nombresDeEventos]} para personas asignadas a más de un evento la misma fecha
-  const eventosDia = state.eventos.filter(e=>e.fecha===fecha && e.id!==eventoIdActual);
+  const eventosDia = state.eventos.filter(e=>e.estado!=='perdido' && e.fecha===fecha && e.id!==eventoIdActual);
   const conteo = {};
   eventosDia.forEach(e=>(e.personalAsignado||[]).forEach(pid=>{
     if(!conteo[pid]) conteo[pid] = [];
@@ -1569,6 +1794,7 @@ function render(){
   const secciones = [
     { id: 'inicio', label: 'Inicio', icon: '◐', tabs: [
       ['calendario','Calendario'],
+      ['quehacer','Qué hacer'+((()=>{ try{ const r = quehacerResumen(); const n = r.urgente + r.semana; return n?' ('+n+')':''; }catch(e){ return ''; } })())],
     ]},
     { id: 'eventos', label: 'Eventos', icon: '▤', tabs: [
       ['eventos','Eventos'],
@@ -1586,6 +1812,7 @@ function render(){
       ['compras','Compras'],
       ['gastos','Gastos e Inversiones'],
       ['revisar','A revisar'+gxBadgeRevisar()],
+      ['pendientecobro','Pendiente de cobro'+((()=>{ try{ const n = eventosPendientesCobro().length; return n?' ('+n+')':''; }catch(e){ return ''; } })())],
       ['cobros','Cobros'],
       ['cajas','Cajas'],
       ['arqueos','Arqueos y ajustes'+arqBadge()],
@@ -1694,6 +1921,8 @@ function renderPanel(){
     eventos: renderEventos,
     'armar-eventos': renderArmarEventos,
     cobros: renderCobros,
+    pendientecobro: renderPendienteCobro,
+    quehacer: renderQueHacer,
     degustaciones: renderDegustaciones,
     recetario: renderRecetario,
     presupuestos: renderPresupuestos,
@@ -1713,7 +1942,7 @@ function renderPanel(){
     actividad: renderActividad,
     administradores: renderAdministradores,
   };
-  const adminOnly = new Set(['eventos','armar-eventos','cobros','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','revisar','cajas','arqueos','prestamosAdmin','pagos','reportes','actividad','administradores']);
+  const adminOnly = new Set(['quehacer','eventos','armar-eventos','cobros','pendientecobro','degustaciones','recetario','presupuestos','equipo','disponibilidad','produccion','compras','insumos','prestamos','gastos','revisar','cajas','arqueos','prestamosAdmin','pagos','reportes','actividad','administradores']);
   if(adminOnly.has(currentTab) && !adminUnlocked){
     panel.innerHTML = `<div class="empty">Necesitás ingresar como administrador para ver esta sección.</div>`;
     return;
@@ -1735,6 +1964,7 @@ function renderCalendario(){
   const byDay = {};
   function push(dstr, item){ if(!byDay[dstr]) byDay[dstr]=[]; byDay[dstr].push(item); }
   state.eventos.forEach(ev=>{
+    if(ev.estado==='perdido') return;
     if(ev.fecha) push(ev.fecha, {type: ev.estado, label: `${ev.estado==='reservado'?'Evento reservado':'Evento posible'}: ${ev.lugar||''}`, eventoId: ev.id});
     if(ev.degustacionFecha) push(ev.degustacionFecha, {type:'degustacion', label:`Degustación: ${ev.lugar||''}`, eventoId: ev.id});
     if(ev.reunionPlannerFecha) push(ev.reunionPlannerFecha, {type:'reunion', label:`Reunión con planner${ev.planner?' ('+ev.planner+')':''}: ${ev.lugar||''}`, eventoId: ev.id});
@@ -1760,45 +1990,87 @@ function renderCalendario(){
   }
 
   // upcoming lists
-  const upcomingEventos = state.eventos.filter(e=>e.fecha && e.fecha>=today).sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,6);
-  const upcomingDegu = state.eventos.filter(e=>e.degustacionFecha && e.degustacionFecha>=today).sort((a,b)=>a.degustacionFecha.localeCompare(b.degustacionFecha)).slice(0,6);
+  const upcomingEventos = state.eventos.filter(e=>e.estado!=='perdido' && e.fecha && e.fecha>=today).sort((a,b)=>a.fecha.localeCompare(b.fecha)).slice(0,6);
+  const upcomingDegu = state.eventos.filter(e=>e.estado!=='perdido' && e.degustacionFecha && e.degustacionFecha>=today).sort((a,b)=>a.degustacionFecha.localeCompare(b.degustacionFecha)).slice(0,6);
 
   const totalReservados = state.eventos.filter(e=>e.estado==='reservado').length;
   const totalPosibles = state.eventos.filter(e=>e.estado==='posible').length;
   const ingresosMes = sumaWhere(state.eventos.filter(e=>e.fecha && e.fecha.slice(0,7)===`${year}-${String(month+1).padStart(2,'0')}`), ()=>true) ;
-  const proximoEvento = upcomingEventos[0] || null;
-  const pendienteCobroTotal = state.eventos.filter(ev=>ev.estado==='reservado').reduce((s,ev)=>s+Math.max(0, saldoPendienteEvento(ev)), 0);
+  const proximoEvento = state.eventos.filter(e=>e.estado==='reservado' && e.fecha && e.fecha>=today).sort((a,b)=>a.fecha.localeCompare(b.fecha))[0] || upcomingEventos[0] || null;
+  const pendCobro = eventosPendientesCobro();
+  const pendienteCobroTotal = pendCobro.reduce((s,x)=>s+x.saldo, 0);
+  const pendCobroVencidos = pendCobro.filter(x=>x.ev.fecha && x.ev.fecha<today);
+  const proxReservados = state.eventos.filter(e=>e.estado==='reservado' && (!e.fecha || e.fecha>=today)).sort((a,b)=>(a.fecha||'9999').localeCompare(b.fecha||'9999'));
+  const proxPosibles = state.eventos.filter(e=>e.estado==='posible' && e.fecha && e.fecha>=today).sort((a,b)=>a.fecha.localeCompare(b.fecha));
+  const porCerrar = state.eventos.filter(e=>clasificarEvento(e)==='pasado');
 
   const prodPagados = state.produccion.filter(p=>p.pagado).length;
   const prodPendientes = state.produccion.length - prodPagados;
 
+  const filaProx = (e, conSaldo)=>{
+    const saldo = (adminUnlocked && conSaldo) ? saldoPendienteEvento(e) : 0;
+    const d = diasHastaEvento(e.fecha);
+    const f = e.fecha ? new Date(e.fecha+'T00:00:00') : null;
+    return `<div class="li">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <div class="chip-fecha ${e.estado==='posible'?'posible':''}">${f?f.getDate():'?'}</div>
+        <div>
+          <div class="t">${gxEsc(nombreEvento(e))} <span class="badge ${e.estado}">${e.estado}</span>${d!==null&&d<=7?` <span class="badge ev-pronto">${textoDiasEvento(e.fecha)}</span>`:''}</div>
+          <div class="d">${f?f.toLocaleDateString('es-PY',{weekday:'long', day:'numeric', month:'long'}):'Sin fecha'}${d!==null&&d>7?' · '+textoDiasEvento(e.fecha):''} · ${e.cantidadPersonas||(Number(e.adultos||0)+Number(e.jovenes||0))||'—'} personas${e.horarioInicio?' · '+e.horarioInicio+' hs':''}${saldo>0?` · <span style="color:var(--gold);">debe ${fmtMoney(saldo)}</span>`:''}</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;">
+        ${adminUnlocked ? `<button class="btn small ghost" data-open-evento="${e.id}">Ver</button>` : ''}${adminUnlocked && e.estado==='posible' ? `<button class="btn small ghost" data-perdio="${e.id}">Se perdió</button>` : ''}
+        <a class="btn small ghost" href="${waLink(waRecordatorioEvento(e))}" target="_blank" rel="noopener">WhatsApp</a>
+      </div>
+    </div>`;
+  };
+  const bloqueProximos = `
+    <div class="card" style="margin-bottom:14px;">
+      <div class="row-between" style="margin-bottom:6px;">
+        <h3 style="margin:0;font-size:1.05rem;">Próximos eventos <span class="gx-count">${proxReservados.length}</span></h3>
+        ${adminUnlocked ? `<button class="btn small ghost" data-goto-tab="eventos" data-goto-evfiltro="proximo">Ver todos</button>` : ''}
+      </div>
+      <div class="list-simple">
+        ${proxReservados.length ? proxReservados.slice(0,8).map(e=>filaProx(e,true)).join('') : '<div class="d">No hay eventos reservados próximos.</div>'}
+      </div>
+      ${proxReservados.length>8 ? `<div class="section-hint" style="margin-top:8px;">Y ${proxReservados.length-8} más. <a href="javascript:void(0)" data-goto-tab="eventos" data-goto-evfiltro="proximo" style="color:var(--copper-bright);">Ver todos</a></div>` : ''}
+      ${proxPosibles.length ? `<details style="margin-top:12px;">
+        <summary style="cursor:pointer;color:var(--cream-dim);font-size:0.86rem;">${proxPosibles.length} posible${proxPosibles.length===1?'':'s'} (todavía sin confirmar) — próximos 5</summary>
+        <div class="list-simple" style="margin-top:8px;">${proxPosibles.slice(0,5).map(e=>filaProx(e,false)).join('')}</div>
+        ${adminUnlocked ? `<div style="margin-top:8px;"><button class="btn small ghost" data-goto-tab="eventos" data-goto-evfiltro="posible">Ver los ${proxPosibles.length} posibles</button></div>` : ''}
+      </details>` : ''}
+      ${adminUnlocked && porCerrar.length ? `<div class="gx-aviso card" style="margin:12px 0 0;"><span><b>${porCerrar.length} evento${porCerrar.length===1?'':'s'} ya realizado${porCerrar.length===1?'':'s'} sin cerrar</b> (falta cobrar o pagar algo).</span><button class="btn small" data-goto-tab="eventos" data-goto-evfiltro="pasado">Ver</button></div>` : ''}
+    </div>`;
   return `
+    ${adminUnlocked ? bloqueQueHacerInicio() : ''}
+    ${bloqueProximos}
     ${adminUnlocked ? `
     <div class="grid-cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));">
-      <div class="card featured clickable" data-goto-tab="eventos" style="margin-bottom:0;">
+      <div class="card featured clickable" data-goto-tab="eventos" data-goto-evfiltro="proximo" style="margin-bottom:0;">
         <div class="section-hint" style="margin-top:0;">Próximo evento</div>
         ${proximoEvento ? `
           <div style="display:flex; align-items:center; gap:12px; margin-top:6px;">
             <div class="chip-fecha ${proximoEvento.estado==='posible'?'posible':''}">${new Date(proximoEvento.fecha+'T00:00:00').getDate()}</div>
             <div>
-              <div style="font-family:'Fraunces',serif; font-size:1.1rem;">${proximoEvento.lugar||'(sin lugar)'}</div>
-              <div class="section-hint" style="margin-top:0;">${fmtDate(proximoEvento.fecha)} · ${proximoEvento.cantidadPersonas||'—'} personas</div>
+              <div style="font-family:'Fraunces',serif; font-size:1.1rem;">${gxEsc(nombreEvento(proximoEvento))}</div>
+              <div class="section-hint" style="margin-top:0;">${fmtDate(proximoEvento.fecha)} · ${textoDiasEvento(proximoEvento.fecha)} · ${proximoEvento.cantidadPersonas||'—'} personas</div>
             </div>
           </div>
         ` : '<div class="d" style="margin-top:6px;">No hay eventos próximos.</div>'}
       </div>
-      <div class="card featured clickable" data-goto-tab="cobros" style="margin-bottom:0;">
+      <div class="card featured clickable" data-goto-tab="pendientecobro" style="margin-bottom:0;">
         <div class="section-hint" style="margin-top:0;">Pendiente de cobro</div>
         <div style="font-family:'Fraunces',serif; font-size:1.6rem; color:var(--gold); margin-top:4px;">${fmtMoney(pendienteCobroTotal)}</div>
-        <div class="section-hint" style="margin-top:2px;">Eventos reservados sin cobrar o cobrados parcialmente</div>
+        <div class="section-hint" style="margin-top:2px;">${pendCobro.length ? pendCobro.length+' evento'+(pendCobro.length===1?'':'s')+' con saldo'+(pendCobroVencidos.length?' · <b style="color:var(--red);">'+pendCobroVencidos.length+' ya realizado'+(pendCobroVencidos.length===1?'':'s')+'</b>':'')+' — tocá para ver el detalle' : 'Todo lo reservado está cobrado'}</div>
       </div>
     </div>
     <div style="height:14px;"></div>
     ` : ''}
     <div class="grid-cards">
-      <div class="stat clickable" data-goto-tab="eventos"><div class="k">Eventos reservados</div><div class="v">${totalReservados}</div></div>
-      <div class="stat clickable" data-goto-tab="eventos"><div class="k">Eventos posibles</div><div class="v sage">${totalPosibles}</div></div>
-      <div class="stat clickable" data-goto-tab="degustaciones"><div class="k">Degustaciones agendadas</div><div class="v">${state.eventos.filter(e=>e.degustacionFecha).length}</div></div>
+      <div class="stat clickable" data-goto-tab="eventos" data-goto-evfiltro="proximo"><div class="k">Eventos reservados</div><div class="v">${totalReservados}</div></div>
+      <div class="stat clickable" data-goto-tab="eventos" data-goto-evfiltro="posible"><div class="k">Eventos posibles</div><div class="v sage">${totalPosibles}</div></div>
+      <div class="stat clickable" data-goto-tab="degustaciones"><div class="k">Degustaciones agendadas</div><div class="v">${state.eventos.filter(e=>e.estado!=='perdido' && e.degustacionFecha).length}</div></div>
       <div class="stat clickable" data-goto-tab="produccion">
         <div class="k">Días de producción/limpieza</div>
         <div class="v">${state.produccion.length}</div>
@@ -1823,9 +2095,9 @@ function renderCalendario(){
           <div class="k">Reembolsos pendientes</div>
           <div class="v" style="color:var(--gold); font-size:1.2rem;">${fmtMoney(sumaWhere(state.gastosPersonal, g=>!g.pagado))}</div>
         </div>
-        <div class="stat clickable" data-goto-tab="cobros">
+        <div class="stat clickable" data-goto-tab="pendientecobro">
           <div class="k">Pendiente de cobro</div>
-          <div class="v" style="color:var(--gold); font-size:1.2rem;">${fmtMoney(state.eventos.filter(ev=>ev.estado==='reservado').reduce((s,ev)=>s+Math.max(0, saldoPendienteEvento(ev)), 0))}</div>
+          <div class="v" style="color:var(--gold); font-size:1.2rem;">${fmtMoney(pendienteCobroTotal)}</div>
           <div style="font-size:0.72rem; color:var(--cream-dim); margin-top:4px;">Montos de eventos reservados sin cobrar o cobrados parcialmente (no incluye posibles)</div>
         </div>
       </div>
@@ -1852,14 +2124,6 @@ function renderCalendario(){
       </div>
     </div>
     <div class="field-row" style="align-items:stretch;">
-      <div class="card" style="flex:1;">
-        <h3 style="margin-top:0;font-size:1rem;">Próximos eventos</h3>
-        <div class="list-simple">
-          ${upcomingEventos.length ? upcomingEventos.map(e=>`
-            <div class="li"><div style="display:flex; align-items:center; gap:10px;"><div class="chip-fecha ${e.estado==='posible'?'posible':''}">${new Date(e.fecha+'T00:00:00').getDate()}</div><div><div class="t">${e.lugar||'(sin lugar)'} <span class="badge ${e.estado}">${e.estado}</span></div><div class="d">${fmtDate(e.fecha)} · ${e.cantidadPersonas||'—'} personas</div></div></div><a class="btn small ghost" href="${waLink(waRecordatorioEvento(e))}" target="_blank" rel="noopener">WhatsApp</a></div>
-          `).join('') : '<div class="d">No hay eventos próximos.</div>'}
-        </div>
-      </div>
       <div class="card" style="flex:1;">
         <h3 style="margin-top:0;font-size:1rem;">Próximas degustaciones</h3>
         <div class="list-simple">
@@ -1953,7 +2217,7 @@ function openEventoParaDegustacionModal(dstr){
       <div class="field"><label>¿Para qué evento es esta degustación?</label>
         <select name="eventoDeguId">
           <option value="">— Crear un evento nuevo —</option>
-          ${state.eventos.map(e=>`<option value="${e.id}">${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}
+          ${state.eventos.map(e=>`<option value="${e.id}">${nombreEvento(e)} — ${fmtDate(e.fecha)}</option>`).join('')}
         </select>
       </div>
       <div class="section-hint">Si elegís "Crear un evento nuevo", se abre el formulario de evento con la fecha de degustación ya cargada.</div>
@@ -1976,13 +2240,24 @@ function openEventoParaDegustacionModal(dstr){
 
 // ================= EVENTOS =================
 function renderEventos(){
-  const rows = [...state.eventos].sort((a,b)=>(a.fecha||'9999').localeCompare(b.fecha||'9999'));
+  const clases = {}; EV_CLASES_ORDEN.forEach(k=>clases[k]=[]);
+  state.eventos.forEach(ev=>clases[clasificarEvento(ev)].push(ev));
+  if(evFiltro!=='todos' && !clases[evFiltro]) evFiltro = 'proximo';
+  const asc = (x,y)=>(x.fecha||'9999').localeCompare(y.fecha||'9999');
+  const desc = (x,y)=>(y.fecha||'').localeCompare(x.fecha||'');
+  const rows = (evFiltro==='todos' ? [...state.eventos].sort(asc) : [...clases[evFiltro]].sort(['pasado','cerrado','vencido'].includes(evFiltro)?desc:asc));
+  const vacio = {proximo:'No hay eventos reservados próximos.', posible:'No hay eventos posibles.', pasado:'No hay eventos pasados por cerrar: todo lo que ocurrió está cobrado y pagado.', cerrado:'Todavía no hay eventos cerrados.', vencido:'No hay posibles vencidos.', todos:'Todavía no cargaste eventos. Creá el primero con "+ Nuevo evento".'};
   return `
     <div class="row-between">
-      <div><h2 class="section-title">Eventos</h2><div class="section-hint">Reservados, señados, pagados y posibles.</div></div>
+      <div><h2 class="section-title">Eventos</h2><div class="section-hint">Clasificados por lo que está pasando con cada uno. Un evento se cierra cuando ya ocurrió, el cliente no debe saldo y el personal y la comisión del planner están pagados.</div></div>
       <button class="btn" id="btnNuevoEvento">+ Nuevo evento</button>
     </div>
-    ${rows.length===0 ? `<div class="empty">Todavía no cargaste eventos. Creá el primero con "+ Nuevo evento".</div>` : `
+    <div class="gx-pills" style="margin-bottom:6px;">
+      ${EV_CLASES_ORDEN.map(k=>`<button class="gx-pill ${evFiltro===k?'on':''}" data-evfiltro="${k}" title="${EV_CLASES[k][1]}">${EV_CLASES[k][0]} <b>${clases[k].length}</b></button>`).join('')}
+      <button class="gx-pill ${evFiltro==='todos'?'on':''}" data-evfiltro="todos">Todos <b>${state.eventos.length}</b></button>
+    </div>
+    <div class="section-hint" style="margin:0 0 12px;">${evFiltro==='todos'?'Todos los eventos por fecha.':EV_CLASES[evFiltro][1]+'.'}</div>
+    ${rows.length===0 ? `<div class="empty">${vacio[evFiltro]}</div>` : `
     <div class="card" style="padding:0; overflow-x:auto;">
     <table>
       <thead><tr>
@@ -1993,15 +2268,15 @@ function renderEventos(){
           const b = balanceEvento(ev);
           const saldoPend = saldoPendienteEvento(ev);
           return `<tr data-id="${ev.id}">
-            <td>${fmtDate(ev.fecha)}</td>
-            <td>${ev.lugar||'—'}${ev.tipoEvento?`<br><span class="d" style="color:var(--cream-dim);font-size:0.76rem;">${ev.tipoEvento}</span>`:''}</td>
-            <td><span class="badge ${ev.estado}">${ev.estado}</span></td>
+            <td>${fmtDate(ev.fecha)}<br><span class="d" style="color:var(--cream-dim);font-size:0.76rem;">${textoDiasEvento(ev.fecha)}</span></td>
+            <td>${gxEsc(nombreEvento(ev))}${ev.clienteTelefono?`<br><span class="d" style="color:var(--cream-dim);font-size:0.76rem;">${gxEsc(ev.clienteTelefono)}</span>`:''}${ev.tipoEvento?`<br><span class="d" style="color:var(--cream-dim);font-size:0.76rem;">${ev.tipoEvento}</span>`:''}</td>
+            <td><span class="badge ${ev.estado}">${ev.estado}</span>${semaforoEvento(ev)}${evFiltro==='todos'?`<br><span class="badge ev-${clasificarEvento(ev)}">${EV_CLASES[clasificarEvento(ev)][0]}</span>`:(clasificarEvento(ev)==='pasado'?`<br><span class="d" style="color:var(--gold);font-size:0.74rem;">${(()=>{ const c = estadoCicloEvento(ev); return [c.saldoCerrado?'':'Cliente debe saldo', c.personalPagado?'':'Personal sin pagar', c.comisionPagada?'':'Comisión planner sin pagar'].filter(Boolean).join(' · '); })()}</span>`:'')}</td>
             <td>${ev.adultos||ev.jovenes?`${ev.adultos||0} ad. / ${ev.jovenes||0} jóv.`:(ev.cantidadPersonas||'—')}${ev.tragos?`<br><span class="d" style="color:var(--cream-dim);font-size:0.76rem;">${ev.tragos}</span>`:''}</td>
-            <td>${ev.pagadoTotal ? '<span class="badge pagado">pagado</span>' : (ev.senaPercent ? `<span class="badge senado">seña ${ev.senaPercent}%</span>` : '—')}</td>
+            <td>${(()=>{ const cob = cobradoEvento(ev.id), tot = Number(ev.montoTotal)||0; if(ev.estado==='perdido') return ev.perdidoMotivo?`<span class="d" style="font-size:0.76rem;color:var(--cream-dim);">${gxEsc(ev.perdidoMotivo)}${ev.perdidoNota?' — '+gxEsc(ev.perdidoNota):''}</span>`:'—'; if(!tot && !cob) return '—'; const pct = tot>0?Math.min(100,Math.round(cob/tot*100)):0; return `<span class="mono" style="font-size:0.8rem;">${fmtMoney(cob)}</span><div class="section-hint" style="margin:0;">de ${fmtMoney(tot)} · ${pct}%</div>${ev.pagadoTotal && tot>0 && cob < tot*0.999 ? '<span class="badge senado" title="Tiene marca antigua de pagado, pero los cobros cargados no llegan al precio">revisar cobros</span>' : ''}${(ev.estado==='reservado' && ev.fecha && ev.fecha>=todayStr() && saldoPendienteEvento(ev)>0 && saldoVenceEvento(ev)) ? `<div class="section-hint" style="margin:0;color:${saldoVenceEvento(ev)<todayStr()?'var(--red)':'var(--cream-dim)'};">saldo ${saldoVenceEvento(ev)<todayStr()?'venció':'vence'} ${textoDiasEvento(saldoVenceEvento(ev))}</div>`:''}`; })()}</td>
             <td class="mono" style="color:${saldoPend>0?'var(--copper-bright)':'var(--sage)'}">${fmtMoney(saldoPend)}</td>
             <td>${ev.planner||'—'}</td>
             <td class="mono" style="color:${b.balance>=0?'var(--sage)':'var(--red)'}">${fmtMoney(b.balance)}</td>
-            <td><button class="btn small ghost" data-open-evento="${ev.id}">Ver / editar</button></td>
+            <td style="white-space:nowrap;"><button class="btn small ghost" data-open-evento="${ev.id}">Ver / editar</button>${ev.estado==='posible'?` <button class="btn small ghost" data-perdio="${ev.id}">Se perdió</button>`:''}${ev.estado==='perdido'?` <button class="btn small ghost" data-reabrir="${ev.id}">Reabrir</button>`:''}</td>
           </tr>`;
         }).join('')}
       </tbody>
@@ -2018,9 +2293,14 @@ function eventoFormFields(ev){
         <select name="estado">
           <option value="posible" ${ev.estado==='posible'?'selected':''}>Posible</option>
           <option value="reservado" ${ev.estado==='reservado'?'selected':''}>Reservado</option>
+          ${ev.estado==='perdido'?`<option value="perdido" selected>Perdido (${gxEsc(ev.perdidoMotivo||'')})</option>`:''}
         </select>
       </div>
       <div class="field"><label>Fecha del evento</label><input type="date" name="fecha" value="${ev.fecha||''}"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>Cliente (quién contrata)</label><input type="text" name="cliente" value="${gxEsc(ev.cliente||'')}" placeholder="Nombre del cliente o empresa"></div>
+      <div class="field"><label>Teléfono del cliente</label><input type="text" inputmode="tel" name="clienteTelefono" value="${gxEsc(ev.clienteTelefono||'')}" placeholder="0981 123 456"></div>
     </div>
     <div class="field"><label>Lugar</label><input type="text" name="lugar" value="${ev.lugar||''}" placeholder="Salón, quinta, dirección…"></div>
     <div class="checkline"><input type="checkbox" name="fueraAsuncion" id="evFueraAsuncion" ${ev.fueraAsuncion?'checked':''}><label for="evFueraAsuncion">Fuera de Asunción o alrededores</label></div>
@@ -2074,8 +2354,20 @@ function eventoFormFields(ev){
       <div class="field"><label>Monto total del evento</label><input type="text" inputmode="decimal" class="input-monto" name="montoTotal" value="${ev.montoTotal||''}"></div>
       <div class="field"><label>Seña (%)</label><input type="number" name="senaPercent" value="${ev.senaPercent||''}"></div>
     </div>
-    <div class="checkline"><input type="checkbox" name="pagadoTotal" id="chkPagado" ${ev.pagadoTotal?'checked':''}><label for="chkPagado">Pagado en su totalidad</label></div>
-    <div class="section-hint" style="margin:-10px 0 14px;">Si tildás esto, el saldo pendiente queda en Gs. 0 aunque no hayas cargado cobros individuales.</div>
+    ${(()=>{
+      const cob = ev.id ? cobradoEvento(ev.id) : 0, tot = Number(ev.montoTotal)||0;
+      const cajaSug = state.cajas.find(c=>c.administradorId===(adminUnlocked&&adminUnlocked.id)) || state.cajas[0];
+      let h = '';
+      if(ev.id) h += `<div class="card" style="margin:0 0 12px;padding:10px 12px;"><div class="section-hint" style="margin:0;">Cobrado hasta ahora</div><div style="font-size:1.05rem;"><b>${fmtMoney(cob)}</b> de ${fmtMoney(tot)} <span style="color:var(--cream-dim);font-size:0.8rem;">· se calcula solo con los cobros cargados (no hace falta tildar nada)</span></div></div>`;
+      if(ev.pagadoTotal) h += `<div class="checkline"><input type="checkbox" name="pagadoTotal" id="chkPagado" checked><label for="chkPagado">Marca antigua: "Pagado en su totalidad"</label></div><div class="section-hint" style="margin:-10px 0 14px;">Este evento tiene la marca antigua, que deja el saldo en Gs. 0 aunque falten cobros. Lo recomendado es cargar los cobros reales y destildarla.</div>`;
+      else if(cob<=0) h += `<div class="card" style="margin:0 0 12px;padding:10px 12px;">
+        <div class="section-hint" style="margin:0 0 8px;"><b>Seña para reservar.</b> Para pasar a "Reservado" cargá la seña cobrada o elegí por qué no hay seña. Si la cargás acá, se registra el cobro en la caja elegida.</div>
+        <div class="field-row"><div class="field"><label>Seña cobrada ahora (Gs.)</label><input type="text" inputmode="decimal" class="input-monto" name="senaMonto" placeholder="${(()=>{ const s = senaSugeridaEvento(ev); return s?'Sugerida: '+s.toLocaleString('es-PY'):'0'; })()}"></div>
+        <div class="field"><label>Entra a la caja</label><select name="senaCaja">${state.cajas.map(c=>`<option value="${c.id}" ${cajaSug&&cajaSug.id===c.id?'selected':''}>${gxEsc(c.nombre)}</option>`).join('')}</select></div></div>
+        <div class="field" style="margin-bottom:0;"><label>Si no hay seña, motivo</label><select name="sinSenaMotivo"><option value="">— Hay seña / todavía no es reserva —</option>${MOTIVOS_SIN_SENA.map(m=>`<option ${ev.sinSenaMotivo===m?'selected':''}>${m}</option>`).join('')}</select></div></div>`;
+      h += `<div class="field"><label>El saldo vence el</label><input type="date" name="saldoVence" value="${ev.saldoVence||''}"><div class="section-hint" style="margin:4px 0 0;">Si lo dejás vacío se toma 7 días antes del evento${ev.fecha?' ('+fmtDate(addDias(ev.fecha,-7))+')':''}. Se usa para avisarte y para el recordatorio por WhatsApp al cliente.</div></div>`;
+      return h;
+    })()}
     <div class="field-row">
       <div class="field"><label>Planner</label><input type="text" name="planner" value="${ev.planner||''}"></div>
       <div class="field"><label>Comisión planner (%)</label><input type="number" name="comisionPlannerPercent" value="${ev.comisionPlannerPercent||''}"></div>
@@ -2121,6 +2413,10 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
       estado: form.estado.value,
       fecha: form.fecha.value,
       lugar: form.lugar.value.trim(),
+      cliente: form.cliente.value.trim(),
+      clienteTelefono: form.clienteTelefono.value.trim(),
+      saldoVence: form.saldoVence ? form.saldoVence.value : '',
+      sinSenaMotivo: form.sinSenaMotivo ? form.sinSenaMotivo.value : (ev ? (ev.sinSenaMotivo||'') : ''),
       tipoEvento: form.tipoEvento.value,
       horasEvento: form.horasEvento.value,
       horarioInicio: normalizarHora(form.horarioInicio.value),
@@ -2137,7 +2433,7 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
       observaciones: form.observaciones.value.trim(),
       montoTotal: parseMonto(form.montoTotal.value),
       senaPercent: form.senaPercent.value,
-      pagadoTotal: form.pagadoTotal.checked,
+      pagadoTotal: form.pagadoTotal ? form.pagadoTotal.checked : false,
       planner: form.planner.value.trim(),
       comisionPlannerPercent: form.comisionPlannerPercent.value,
       comisionPagada: form.comisionPagada ? form.comisionPagada.checked : (ev?ev.comisionPagada:false),
@@ -2149,8 +2445,8 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
   function persistirEvento(data){
     const personalAnterior = ev ? (ev.personalAsignado||[]) : [];
     let eventoObj;
-    if(ev){ Object.assign(ev, data); eventoObj = ev; pushLog(adminUnlocked.nombre, 'Evento editado', `${data.lugar||'(sin lugar)'} — ${fmtDate(data.fecha)}`); }
-    else { eventoObj = Object.assign({id:uid(), createdAt: Date.now()}, data); state.eventos.push(eventoObj); pushLog(adminUnlocked.nombre, 'Evento creado', `${data.lugar||'(sin lugar)'} — ${fmtDate(data.fecha)}`); }
+    if(ev){ Object.assign(ev, data); eventoObj = ev; pushLog(adminUnlocked.nombre, 'Evento editado', `${nombreEvento(data)} — ${fmtDate(data.fecha)}`); }
+    else { eventoObj = Object.assign({id:uid(), createdAt: Date.now()}, data); state.eventos.push(eventoObj); pushLog(adminUnlocked.nombre, 'Evento creado', `${nombreEvento(data)} — ${fmtDate(data.fecha)}`); }
 
     // generar pendiente de pago automático para el personal recién asignado
     const nuevosIds = data.personalAsignado.filter(pid=>!personalAnterior.includes(pid));
@@ -2436,8 +2732,24 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
     },
     onSave: (form)=>{
       const data = construirDatosEvento(form);
+      const senaNueva = form.senaMonto ? parseMonto(form.senaMonto.value) : 0;
+      const yaCobrado = ev ? cobradoEvento(ev.id) : 0;
+      const pasaAReservado = data.estado==='reservado' && (!ev || ev.estado!=='reservado');
+      if(pasaAReservado && !data.pagadoTotal && !(senaNueva>0) && !(yaCobrado>0) && !data.sinSenaMotivo) return avisarError('Para reservar, cargá la seña cobrada o elegí el motivo de "sin seña".');
+      if(senaNueva>0 && state.cajas.length===0) return avisarError('Creá una caja (pestaña "Cajas") para registrar la seña.');
+      if(senaNueva>0){ data.sinSenaMotivo = ''; }
+      let cajaSena = null;
+      if(senaNueva>0){
+        cajaSena = form.senaCaja ? form.senaCaja.value : state.cajas[0].id;
+        if(ev && buscarDuplicado('cobros', {eventoId: ev.id, fecha: todayStr(), monto: senaNueva, tipo:'cliente', descripcion:'Seña', cajaId: cajaSena}, null)) return avisarDuplicado('un cobro');
+      }
       const eventoObj = persistirEvento(data);
-      manejarSenaAutomatica(eventoObj, data);
+      if(senaNueva>0){
+        state.cobros.push({id:uid(), eventoId: eventoObj.id, fecha: todayStr(), monto: senaNueva, tipo:'cliente', descripcion:'Seña', cajaId: cajaSena, adminId: adminUnlocked.id, origenSena:true});
+        pushLog(adminUnlocked.nombre, 'Cobro de seña registrado', `${fmtMoney(senaNueva)} — ${nombreEvento(eventoObj)}`);
+      } else if(!data.sinSenaMotivo){
+        manejarSenaAutomatica(eventoObj, data);
+      }
       saveState(); closeModal(); render();
     },
     onDelete: ev ? ()=>{
@@ -2623,7 +2935,68 @@ function eventoDetailExtra(ev){
   `;
 }
 
+
+// ================= PENDIENTE DE COBRO =================
+function renderPendienteCobro(){
+  const hoy = todayStr();
+  const todos = eventosPendientesCobro();
+  const realizados = todos.filter(x=>x.ev.fecha && x.ev.fecha<hoy).sort((a,b)=>a.ev.fecha.localeCompare(b.ev.fecha));
+  const proximos = todos.filter(x=>!x.ev.fecha || x.ev.fecha>=hoy).sort((a,b)=>(a.ev.fecha||'9999').localeCompare(b.ev.fecha||'9999'));
+  const suma = l=>l.reduce((s,x)=>s+x.saldo,0);
+  const sinCobro = eventosPagadosSinCobro();
+  const sinCaja = state.cajas.length===0;
+  const tabla = (lista, tipo)=>`
+    <div class="card" style="padding:0; overflow-x:auto;">
+    <table class="gx-tabla">
+      <thead><tr><th>Evento</th><th>Fecha</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Cobrado</th><th style="text-align:right;">Pendiente</th><th style="min-width:110px;">Avance</th><th></th></tr></thead>
+      <tbody>${lista.map(({ev,saldo,cobrado,adicional})=>{
+        const precio = Number(ev.montoTotal)||0;
+        const pct = precio>0 ? Math.max(0, Math.min(100, Math.round(cobrado/precio*100))) : 0;
+        const cobros = state.cobros.filter(c=>c.eventoId===ev.id).sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+        const cargos = (state.cargosAdicionales||[]).filter(c=>c.eventoId===ev.id && !c.cobrado);
+        return `<tr>
+          <td><b>${gxEsc(nombreEvento(ev))}</b>${ev.tipoEvento?`<div class="section-hint">${gxEsc(ev.tipoEvento)}</div>`:''}
+            <details style="margin-top:4px;"><summary style="cursor:pointer;color:var(--cream-dim);font-size:0.78rem;">Detalle (${cobros.length} cobro${cobros.length===1?'':'s'}${cargos.length?` · ${cargos.length} cargo${cargos.length===1?'':'s'} adicional${cargos.length===1?'':'es'}`:''})</summary>
+              <div class="gx-sub">
+                ${cobros.length ? cobros.map(c=>`<div class="gx-subfila"><span>${fmtDate(c.fecha)} · ${c.tipo==='planner'?'Planner':'Cliente'} · ${gxEsc(gxCajaNombre(c.cajaId))}${c.descripcion?' · '+gxEsc(c.descripcion):''}</span><span class="mono" style="color:var(--sage);">${fmtMoney(c.monto)}</span></div>`).join('') : '<div class="section-hint">Todavía no se cargó ningún cobro de este evento.</div>'}
+                ${cargos.map(c=>`<div class="gx-subfila"><span>Cargo adicional: ${gxEsc(c.descripcion||c.concepto||'')}</span><span class="mono" style="color:var(--gold);">${fmtMoney(c.monto)}</span></div>`).join('')}
+                <div class="gx-subfila"><span><b>Precio ${fmtMoney(precio)}</b> − cobrado ${fmtMoney(cobrado)}${adicional?' + adicionales '+fmtMoney(adicional):''}</span><span class="mono"><b>${fmtMoney(saldo)}</b></span></div>
+              </div></details>
+          </td>
+          <td style="white-space:nowrap;">${fmtDate(ev.fecha)}<div class="section-hint" style="${tipo==='realizado'?'color:var(--red);':''}">${textoDiasEvento(ev.fecha)}</div>${tipo!=='realizado' && saldoVenceEvento(ev) ? `<div class="section-hint" style="margin:2px 0 0;color:${saldoVenceEvento(ev)<hoy?'var(--red)':'var(--gold)'};">Saldo ${saldoVenceEvento(ev)<hoy?'venció':'vence'} ${textoDiasEvento(saldoVenceEvento(ev))}</div>`:''}</td>
+          <td class="mono" style="text-align:right;">${fmtMoney(precio)}</td>
+          <td class="mono" style="text-align:right;color:var(--sage);">${fmtMoney(cobrado)}</td>
+          <td class="mono" style="text-align:right;color:${tipo==='realizado'?'var(--red)':'var(--gold)'};"><b>${fmtMoney(saldo)}</b></td>
+          <td><div class="gx-bar"><i style="width:${pct}%;background:var(--sage);"></i></div><div class="section-hint">${pct}% cobrado</div></td>
+          <td style="white-space:nowrap;"><button class="btn small" data-cobrar-evento="${ev.id}" ${sinCaja?'disabled':''}>Registrar cobro</button> <button class="btn small ghost" data-open-evento="${ev.id}">Ver evento</button>${ev.clienteTelefono?` <a class="btn small ghost" href="${waClienteSaldo(ev)}" target="_blank" rel="noopener">Recordar</a>`:''}</td>
+        </tr>`; }).join('')}</tbody>
+    </table></div>`;
+  return `
+    <div class="row-between">
+      <div><h2 class="section-title">Pendiente de cobro</h2><div class="section-hint">Eventos reservados con saldo sin cobrar. No incluye los posibles. Podés registrar el cobro directamente desde acá.</div></div>
+      <button class="btn ghost" data-goto-tab="cobros">Ver todos los cobros</button>
+    </div>
+    <div class="grid-cards">
+      <div class="stat featured"><div class="k">Total pendiente</div><div class="v" style="color:var(--gold);">${fmtMoney(suma(todos))}</div><div class="section-hint">${todos.length} evento${todos.length===1?'':'s'}</div></div>
+      <div class="stat"><div class="k">De eventos ya realizados</div><div class="v red">${fmtMoney(suma(realizados))}</div><div class="section-hint">${realizados.length} evento${realizados.length===1?'':'s'} · urgente</div></div>
+      <div class="stat"><div class="k">De eventos próximos</div><div class="v">${fmtMoney(suma(proximos))}</div><div class="section-hint">${proximos.length} evento${proximos.length===1?'':'s'} · normal</div></div>
+    </div>
+    ${todos.length===0 ? '<div class="empty">No hay nada pendiente: todos los eventos reservados están cobrados. 🎉</div>' : ''}
+    ${realizados.length ? `<h3 class="gx-h" style="margin-top:18px;">Ya realizados y sin cobrar del todo <span class="gx-count">${realizados.length}</span></h3>${tabla(realizados,'realizado')}` : ''}
+    ${proximos.length ? `<h3 class="gx-h" style="margin-top:18px;">Próximos con saldo pendiente <span class="gx-count">${proximos.length}</span></h3>${tabla(proximos,'proximo')}` : ''}
+    ${sinCobro.length ? `
+    <div class="card" style="margin-top:18px;">
+      <h3 class="gx-h">Figuran como pagados, pero sin los cobros cargados <span class="gx-count">${sinCobro.length}</span></h3>
+      <div class="section-hint" style="margin-bottom:8px;">Estos eventos tienen marcado "pagado total", pero los cobros registrados no llegan al precio. Si la plata se recibió, tiene que estar cargada en alguna caja; si no, no aparece en ningún saldo.</div>
+      <table class="gx-tabla"><thead><tr><th>Evento</th><th>Fecha</th><th style="text-align:right;">Precio</th><th style="text-align:right;">Cobros cargados</th><th style="text-align:right;">Sin cargar</th><th></th></tr></thead><tbody>
+      ${sinCobro.map(ev=>{ const precio = Number(ev.montoTotal)||0, cob = cobradoEvento(ev.id); return `<tr><td>${gxEsc(ev.lugar||'(sin lugar)')}</td><td style="white-space:nowrap;">${fmtDate(ev.fecha)}</td><td class="mono" style="text-align:right;">${fmtMoney(precio)}</td><td class="mono" style="text-align:right;">${fmtMoney(cob)}</td><td class="mono" style="text-align:right;color:var(--red);">${fmtMoney(precio-cob)}</td><td style="white-space:nowrap;"><button class="btn small" data-cobrar-evento="${ev.id}" ${sinCaja?'disabled':''}>Cargar cobro</button> <button class="btn small ghost" data-open-evento="${ev.id}">Ver evento</button></td></tr>`; }).join('')}
+      </tbody></table>
+    </div>` : ''}
+  `;
+}
+
 // ================= COBROS =================
+
 function renderCobros(){
   const rows = [...state.cobros].sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
   const totalCliente = sumaWhere(state.cobros, c=>c.tipo==='cliente' || !c.tipo);
@@ -2673,7 +3046,7 @@ function cobroFormFields(c){
   const cajaSugerida = c.cajaId || (state.cajas.find(cc=>cc.administradorId===(adminUnlocked&&adminUnlocked.id))||{}).id || '';
   return `
     <div class="field"><label>Evento</label>
-      <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${c.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
+      <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${c.eventoId===e.id?'selected':''}>${nombreEvento(e)} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
     </div>
     <div class="field-row">
       <div class="field"><label>Fecha</label><input type="date" name="fecha" value="${c.fecha||todayStr()}"></div>
@@ -2690,11 +3063,11 @@ function cobroFormFields(c){
     <div class="field"><label>Nota (opcional)</label><input type="text" name="descripcion" value="${c.descripcion||''}"></div>
   `;
 }
-function openCobroModal(id){
+function openCobroModal(id, pre){
   const c = id ? state.cobros.find(x=>x.id===id) : null;
   modalContent = {
     title: c ? 'Editar cobro' : 'Nuevo cobro',
-    bodyHtml: cobroFormFields(c),
+    bodyHtml: cobroFormFields(c || pre || null),
     onSave: (form)=>{
       const data = {
         eventoId: form.eventoId.value, fecha: form.fecha.value, monto: parseMonto(form.monto.value),
@@ -2719,9 +3092,9 @@ function openCobroModal(id){
 
 // ================= DEGUSTACIONES =================
 function renderDegustaciones(){
-  const rows = state.eventos.filter(e=>e.degustacionFecha).sort((a,b)=>a.degustacionFecha.localeCompare(b.degustacionFecha));
+  const rows = state.eventos.filter(e=>e.estado!=='perdido' && e.degustacionFecha).sort((a,b)=>a.degustacionFecha.localeCompare(b.degustacionFecha));
   const sinFecha = state.eventos.filter(e=>!e.degustacionFecha);
-  const reuniones = state.eventos.filter(e=>e.reunionPlannerFecha).sort((a,b)=>a.reunionPlannerFecha.localeCompare(b.reunionPlannerFecha));
+  const reuniones = state.eventos.filter(e=>e.estado!=='perdido' && e.reunionPlannerFecha).sort((a,b)=>a.reunionPlannerFecha.localeCompare(b.reunionPlannerFecha));
   const sinReunion = state.eventos.filter(e=>!e.reunionPlannerFecha);
   return `
     <div class="row-between">
@@ -2933,7 +3306,7 @@ function presupuestoFormFields(p){
     <div class="field"><label>Evento (opcional — para prellenar)</label>
       <select id="pEvento">
         <option value="">— Ninguno —</option>
-        ${state.eventos.map(e=>`<option value="${e.id}" ${p&&p.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}
+        ${state.eventos.map(e=>`<option value="${e.id}" ${p&&p.eventoId===e.id?'selected':''}>${nombreEvento(e)} — ${fmtDate(e.fecha)}</option>`).join('')}
       </select>
     </div>
     <div class="field"><label>Nombre del evento</label><input type="text" name="nombreEvento" value="${p?(p.nombreEvento||''):''}" placeholder="Ej: XV años de Valeska"></div>
@@ -3774,7 +4147,7 @@ function personalesFormHtml(){
 // ================= DISPONIBILIDAD =================
 function renderDisponibilidad(){
   if(!disponibilidadFecha) disponibilidadFecha = todayStr();
-  const eventosDia = state.eventos.filter(e=>e.fecha===disponibilidadFecha);
+  const eventosDia = state.eventos.filter(e=>e.estado!=='perdido' && e.fecha===disponibilidadFecha);
   const conteo = {};
   eventosDia.forEach(e=>(e.personalAsignado||[]).forEach(pid=>{ conteo[pid]=(conteo[pid]||0)+1; }));
   return `
@@ -4127,7 +4500,7 @@ function compraFormFields(c){
         </select>
       </div>
       <div class="field" id="compraEventoWrap" style="${tipoCompra==='evento'?'':'display:none;'}"><label>Evento</label>
-        <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${c.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
+        <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${c.eventoId===e.id?'selected':''}>${nombreEvento(e)} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
       </div>
     </div>
     <div class="field-row">
@@ -5075,7 +5448,7 @@ function gxRevisiones(libro){
   const hoy2 = todayStr();
   (state.eventos||[]).forEach(ev=>{
     const precio = Number(ev.montoTotal)||0;
-    if(!(precio>0) || !ev.fecha || ev.estado==='posible' || ev.estado==='cancelado') return;
+    if(!(precio>0) || !ev.fecha || ev.estado==='posible' || ev.estado==='perdido' || ev.estado==='cancelado') return;
     const cobrado = libro.filter(e=>e.eventoId===ev.id && e.signo>0 && e.nat!=='interno').reduce((a,x)=>a+x.monto,0);
     const falta = precio-cobrado;
     const sint = {key:'evento:'+ev.id, fuente:'evento', ref:ev.id, fecha:ev.fecha, signo:1, nat:'ingreso', cat:'ing_cobro', cajaId:null, adminId:null, detalle:(ev.lugar||'(sin lugar)')+' — precio '+fmt(precio)+', cobrado '+fmt(cobrado), org:'Cliente', dst:'', conf:'alta', synthetic:true};
@@ -5878,7 +6251,7 @@ function gastoFormFields(g){
         </select>
       </div>
       <div class="field" id="gastoEventoWrap" style="${g.tipo==='evento'?'':'display:none;'}"><label>Evento</label>
-        <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${g.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
+        <select name="eventoId">${state.eventos.map(e=>`<option value="${e.id}" ${g.eventoId===e.id?'selected':''}>${nombreEvento(e)} — ${fmtDate(e.fecha)}</option>`).join('')}</select>
       </div>
     </div>
 
@@ -6508,10 +6881,11 @@ function pagoFormFields(p){
     <div class="field"><label>Persona</label>
       <select name="personaId">${state.personal.map(per=>`<option value="${per.id}" ${p.personaId===per.id?'selected':''}>${per.nombre} (${per.rol})</option>`).join('')}</select>
     </div>
-    <div class="field"><label>Evento (opcional — dejar vacío si es un pago general)</label>
+    <div class="field"><label>¿A qué evento corresponde este pago?</label>
       <select name="eventoId">
-        <option value="">— General —</option>
-        ${state.eventos.map(e=>`<option value="${e.id}" ${p.eventoId===e.id?'selected':''}>${e.lugar||'(sin lugar)'} — ${fmtDate(e.fecha)}</option>`).join('')}
+        ${p.id ? '' : '<option value="" selected disabled>— Elegí el evento —</option>'}
+        <option value="__general" ${p.id && !p.eventoId ? 'selected':''}>General / sin evento (sueldo, ajuste, etc.)</option>
+        ${state.eventos.map(e=>`<option value="${e.id}" ${p.eventoId===e.id?'selected':''}>${nombreEvento(e)} — ${fmtDate(e.fecha)}</option>`).join('')}
       </select>
     </div>
     <div class="field-row">
@@ -6531,10 +6905,11 @@ function openPagoModal(id){
     bodyHtml: pagoFormFields(p),
     onSave: (form)=>{
       const data = {
-        personaId: form.personaId.value, eventoId: form.eventoId.value || null,
+        personaId: form.personaId.value, eventoId: (form.eventoId.value && form.eventoId.value!=='__general') ? form.eventoId.value : null,
         fecha: form.fecha.value, monto: parseMonto(form.monto.value), descripcion: form.descripcion.value.trim(),
         cajaId: form.cajaId.value, adminId: p ? p.adminId : adminUnlocked.id,
       };
+      if(!p && !form.eventoId.value) return avisarError('Elegí el evento del pago, o "General / sin evento" si no corresponde a ninguno.');
       if(!data.fecha) return avisarError('Elegí la fecha del pago.');
       if(!(data.monto>0)) return avisarError('Ingresá un monto mayor a cero.');
       if(buscarDuplicado('pagos', data, p ? p.id : null)) return avisarDuplicado('un pago');
@@ -6898,7 +7273,7 @@ function descargarReportesExcel(){
   // Hoja: Resumen mensual
   const meses = {};
   function ensure(m){ if(!meses[m]) meses[m] = {eventos:0, cobrado:0, ingresosCaja:0, egresosCaja:0}; return meses[m]; }
-  state.eventos.forEach(e=>{ if(e.fecha) ensure(e.fecha.slice(0,7)).eventos++; });
+  state.eventos.forEach(e=>{ if(e.fecha && e.estado!=='perdido') ensure(e.fecha.slice(0,7)).eventos++; });
   state.cobros.forEach(c=>{ if(c.fecha) ensure(c.fecha.slice(0,7)).cobrado += Number(c.monto)||0; });
   state.gastos.forEach(g=>{
     if(!g.fecha) return;
@@ -6914,7 +7289,7 @@ function descargarReportesExcel(){
 function renderReportes(){
   const meses = {};
   function ensure(m){ if(!meses[m]) meses[m] = {eventos:0, cobrado:0, ingresosCaja:0, egresosCaja:0}; return meses[m]; }
-  state.eventos.forEach(e=>{ if(e.fecha) ensure(e.fecha.slice(0,7)).eventos++; });
+  state.eventos.forEach(e=>{ if(e.fecha && e.estado!=='perdido') ensure(e.fecha.slice(0,7)).eventos++; });
   state.cobros.forEach(c=>{ if(c.fecha) ensure(c.fecha.slice(0,7)).cobrado += Number(c.monto)||0; });
   state.gastos.forEach(g=>{
     if(!g.fecha) return;
@@ -7279,6 +7654,11 @@ function bindPanelEvents(){
 
   const btnNuevoEvento = document.getElementById('btnNuevoEvento');
   if(btnNuevoEvento) btnNuevoEvento.addEventListener('click', ()=>openEventoModal(null));
+  panel.querySelectorAll('[data-evfiltro]').forEach(b=>b.addEventListener('click', ()=>{ evFiltro = b.dataset.evfiltro; renderPanel(); }));
+  panel.querySelectorAll('[data-cobrar-evento]').forEach(b=>b.addEventListener('click', ()=>{ const ev = state.eventos.find(x=>x.id===b.dataset.cobrarEvento); if(!ev) return; const falta = Math.max(0, (Number(ev.montoTotal)||0) - cobradoEvento(ev.id)); const pm = Number(b.dataset.preMonto)||0; const m = pm>0 ? pm : falta; openCobroModal(null, Object.assign({tipo:'cliente', eventoId:ev.id, monto: m>0 ? m.toLocaleString('es-PY') : ''}, pm>0?{descripcion:'Seña'}:{})); }));
+  panel.querySelectorAll('[data-perdio]').forEach(b=>b.addEventListener('click', ()=>openPerdidoModal(b.dataset.perdio)));
+  panel.querySelectorAll('[data-reabrir]').forEach(b=>b.addEventListener('click', ()=>{ const ev = eventosDe(b.dataset.reabrir); if(!ev) return; if(!confirm('¿Reabrir este evento como "posible"?')) return; ev.estado = 'posible'; pushLog(adminUnlocked.nombre, 'Evento reabierto', nombreEvento(ev)); saveState(); render(); }));
+  panel.querySelectorAll('[data-comision-pagada]').forEach(b=>b.addEventListener('click', ()=>{ const ev = eventosDe(b.dataset.comisionPagada); if(!ev) return; if(!confirm('¿Confirmás que la comisión del planner ya se pagó? Esto solo marca el evento; el movimiento de plata cargalo en Gastos si todavía no está.')) return; ev.comisionPagada = true; pushLog(adminUnlocked.nombre, 'Comisión de planner marcada como pagada', nombreEvento(ev)); saveState(); render(); }));
   panel.querySelectorAll('[data-open-evento]').forEach(b=>b.addEventListener('click', ()=>openEventoModal(b.dataset.openEvento)));
 
   const btnNuevoCobro = document.getElementById('btnNuevoCobro');
