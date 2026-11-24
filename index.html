@@ -2648,6 +2648,28 @@ function openEventoModal(id, prefillFecha, prefillDegustacionFecha){
             openEventoModal(eventoObj.id);
           });
         }
+        const guardarFormEvento = ()=>persistirEvento(construirDatosEvento(modalEl.querySelector('#modalForm')));
+        modalEl.querySelectorAll('[data-ev-pres-ver]').forEach(b=>b.addEventListener('click', ()=>{ const p = state.presupuestos.find(x=>x.id===b.dataset.evPresVer); if(!p) return; closeModal(); removeModal(); renderPresupuestoPrint(p); }));
+        modalEl.querySelectorAll('[data-ev-pres-asignar]').forEach(b=>b.addEventListener('click', ()=>{
+          const [pid,key] = b.dataset.evPresAsignar.split('|');
+          const p = state.presupuestos.find(x=>x.id===pid); if(!p) return;
+          const op = opcionesPresupuesto(p).find(o=>o.key===key); if(!op) return;
+          if(!confirm(`¿Asignar "${op.titulo}" (${fmtMoney(op.total)}) a este evento? Se actualiza el monto total y las cantidades del evento.`)) return;
+          const eventoObj = guardarFormEvento();
+          asignarOpcionPresupuesto(eventoObj, p, key);
+          saveState(); openEventoModal(eventoObj.id);
+        }));
+        const btnVinc = modalEl.querySelector('#btnEvPresVincular');
+        if(btnVinc) btnVinc.addEventListener('click', ()=>{
+          const pid = modalEl.querySelector('#evPresVincular').value; if(!pid) return;
+          const p = state.presupuestos.find(x=>x.id===pid); if(!p) return;
+          const eventoObj = guardarFormEvento();
+          p.eventoId = eventoObj.id;
+          pushLog(adminUnlocked.nombre, 'Presupuesto vinculado al evento', nombreEvento(eventoObj));
+          saveState(); openEventoModal(eventoObj.id);
+        });
+        const btnPresNuevo = modalEl.querySelector('#btnEvPresNuevo');
+        if(btnPresNuevo) btnPresNuevo.addEventListener('click', ()=>{ const eventoObj = guardarFormEvento(); saveState(); closeModal(); removeModal(); openPresupuestoModal(null, eventoObj.id); });
         const btnConsumo = modalEl.querySelector('#btnAgregarConsumo');
         if(btnConsumo){
           btnConsumo.addEventListener('click', ()=>{
@@ -2796,7 +2818,27 @@ function eventoDetailExtra(ev){
   const cobrosDelEvento = state.cobros.filter(c=>c.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
   const consumosDelEvento = state.movimientosInsumo.filter(m=>m.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
   const cargosDelEvento = state.cargosAdicionales.filter(c=>c.eventoId===ev.id).sort((a,b2)=>(b2.fecha||'').localeCompare(a.fecha||''));
-  return `
+  const presVinc = state.presupuestos.filter(p=>p.eventoId===ev.id).sort((a,b)=>(b.fechaCreacion||0)-(a.fechaCreacion||0));
+  const presLibres = state.presupuestos.filter(p=>p.eventoId!==ev.id).sort((a,b)=>((a.fecha===ev.fecha)?0:1)-((b.fecha===ev.fecha)?0:1) || (b.fechaCreacion||0)-(a.fechaCreacion||0));
+  const bloquePres = `
+    <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
+      <h3 style="font-size:0.95rem; margin:0 0 4px;">Presupuestos de este evento <span class="gx-count">${presVinc.length}</span></h3>
+      <div class="section-hint" style="margin:0 0 8px;">Si el presupuesto tiene varias opciones (barra libre, packs de tragos), marcá la que contrató el cliente: se carga el monto total y las cantidades en el evento.</div>
+      ${presVinc.length===0 ? '<div class="section-hint">Todavía no hay presupuestos vinculados a este evento.</div>' : presVinc.map(p=>{
+        const ops = opcionesPresupuesto(p);
+        return `<div class="card" style="margin:0 0 10px;padding:10px 12px;">
+          <div class="row-between" style="margin-bottom:6px;"><div><b>${gxEsc(p.nombreEvento||p.cliente||'Presupuesto')}</b> <span class="section-hint" style="margin:0;">· creado ${new Date(p.fechaCreacion).toLocaleDateString('es-PY')}</span></div>
+            <button type="button" class="btn small ghost" data-ev-pres-ver="${p.id}">Ver / Imprimir</button></div>
+          ${ops.length===0 ? '<div class="section-hint">Sin opciones cargadas.</div>' : ops.map(o=>{ const sel = ev.presupuestoId===p.id && ev.presupuestoOpcion===o.key; return `<div class="gx-subfila" style="align-items:center;gap:8px;${sel?'background:color-mix(in srgb, var(--sage) 14%, transparent);border-radius:6px;padding:4px 6px;':''}">
+            <span><b>${gxEsc(o.titulo)}</b><br><span class="section-hint" style="margin:0;">${gxEsc(o.detalle)}</span></span>
+            <span style="display:flex;align-items:center;gap:8px;"><span class="mono">${fmtMoney(o.total)}</span>${sel ? '<span class="badge reservado">✓ Asignada</span>' : `<button type="button" class="btn small" data-ev-pres-asignar="${p.id}|${o.key}">Asignar</button>`}</span></div>`; }).join('')}
+        </div>`; }).join('')}
+      <div class="field-row" style="align-items:flex-end;margin-top:6px;">
+        ${presLibres.length ? `<div class="field" style="margin-bottom:0;flex:1;"><label>Vincular un presupuesto existente</label><select id="evPresVincular"><option value="">— Elegí —</option>${presLibres.map(p=>`<option value="${p.id}">${gxEsc(p.nombreEvento||p.cliente||'Presupuesto')} — ${fmtDate(p.fecha)}</option>`).join('')}</select></div><button type="button" class="btn small ghost" id="btnEvPresVincular">Vincular</button>` : ''}
+        <button type="button" class="btn small ghost" id="btnEvPresNuevo">+ Nuevo presupuesto para este evento</button>
+      </div>
+    </div>`;
+  return bloquePres + `
     <div style="margin-top:18px; border-top:1px solid var(--line); padding-top:14px;">
       <h3 style="font-size:0.95rem; margin:0 0 8px;">Resumen financiero</h3>
       <div class="balance-box">
@@ -3213,26 +3255,101 @@ function openTragoModal(id){
 }
 
 // ================= PRESUPUESTOS =================
+
+// ================= OPCIONES DE PRESUPUESTO → EVENTO =================
+// Reconoce cada opción de un presupuesto (barra libre 1 y 2, packs de tragos con y sin alcohol)
+// para poder elegir una y asignarla al evento.
+function opcionesPresupuesto(p){
+  const out = [];
+  const desc = Number(p.descuentoPercent)||0, factor = 1 - desc/100;
+  if((p.jovenes||0)>0 || (p.adultos||0)>0){
+    const sub = (p.jovenes||0)*p.precioPersonaJoven + (p.adultos||0)*p.precioPersonaAdulto + (p.zonaAjuste||0);
+    const personas = (p.jovenes||0)+(p.adultos||0);
+    out.push({key:'bl1', tipo:'bl', titulo:`Barra libre — ${personas} personas, ${p.horas} h`, detalle:[(p.jovenes>0?p.jovenes+' jóvenes':''),(p.adultos>0?p.adultos+' adultos':'')].filter(Boolean).join(' + ')+(desc>0?` · desc. ${desc}%`:''), total:Math.round(sub*factor), jovenes:p.jovenes||0, adultos:p.adultos||0, horas:p.horas});
+  }
+  const b2 = p.barraLibre2;
+  if(b2 && ((b2.jovenes||0)>0 || (b2.adultos||0)>0)){
+    const sub2 = (b2.jovenes||0)*b2.precioPersonaJoven + (b2.adultos||0)*b2.precioPersonaAdulto;
+    const personas2 = (b2.jovenes||0)+(b2.adultos||0);
+    out.push({key:'bl2', tipo:'bl', titulo:`Barra libre (opción 2) — ${personas2} personas, ${b2.horas} h`, detalle:[(b2.jovenes>0?b2.jovenes+' jóvenes':''),(b2.adultos>0?b2.adultos+' adultos':'')].filter(Boolean).join(' + ')+(desc>0?` · desc. ${desc}%`:''), total:Math.round(sub2*factor), jovenes:b2.jovenes||0, adultos:b2.adultos||0, horas:b2.horas});
+  }
+  (p.tragosConAlcohol||[]).forEach((t,i)=>out.push({key:'con'+i, tipo:'con', titulo:`Pack de ${t.cantidad} tragos con alcohol`, detalle:`${t.cantidad} × ${fmtMoney(t.precio)}`+(desc>0?` · desc. ${desc}%`:''), total:Math.round(t.cantidad*t.precio*factor), tier:{cantidad:t.cantidad, precio:t.precio}}));
+  (p.tragosSinAlcohol||[]).forEach((t,i)=>out.push({key:'sin'+i, tipo:'sin', titulo:`Pack de ${t.cantidad} tragos sin alcohol`, detalle:`${t.cantidad} × ${fmtMoney(t.precio)}`+(desc>0?` · desc. ${desc}%`:''), total:Math.round(t.cantidad*t.precio*factor), tier:{cantidad:t.cantidad, precio:t.precio}}));
+  return out;
+}
+function asignarOpcionPresupuesto(ev, p, key){
+  const op = opcionesPresupuesto(p).find(o=>o.key===key); if(!op) return false;
+  // si otro evento tenía asignado este presupuesto, se libera
+  state.eventos.forEach(e=>{ if(e.id!==ev.id && e.presupuestoId===p.id){ e.presupuestoId = ''; e.presupuestoOpcion = ''; e.presupuestoOpcionTitulo = ''; } });
+  ev.presupuestoId = p.id; ev.presupuestoOpcion = key; ev.presupuestoOpcionTitulo = op.titulo;
+  ev.montoTotal = op.total;
+  if(op.tipo==='bl'){
+    ev.adultos = op.adultos; ev.jovenes = op.jovenes; ev.cantidadPersonas = op.adultos + op.jovenes;
+    if(op.horas) ev.horasEvento = op.horas;
+  } else if(op.tipo==='con'){ ev.tragosConAlcohol = [op.tier]; }
+  else if(op.tipo==='sin'){ ev.tragosSinAlcohol = [op.tier]; }
+  if(!ev.fecha && p.fecha) ev.fecha = p.fecha;
+  p.eventoId = ev.id;
+  pushLog(adminUnlocked.nombre, 'Opción de presupuesto asignada al evento', `${nombreEvento(ev)} — ${op.titulo} — ${fmtMoney(op.total)}`);
+  return true;
+}
+function openAsignarOpcionModal(presId){
+  const p = state.presupuestos.find(x=>x.id===presId); if(!p) return;
+  const ops = opcionesPresupuesto(p);
+  const asignadoA = state.eventos.find(e=>e.presupuestoId===p.id);
+  const evInicial = (asignadoA && asignadoA.id) || p.eventoId || '';
+  const evs = state.eventos.filter(e=>e.estado!=='perdido').sort((a,b)=>(a.fecha||'9999').localeCompare(b.fecha||'9999'));
+  modalContent = {
+    title: 'Asignar opción del presupuesto al evento',
+    customSubmitLabel: 'Asignar al evento',
+    bodyHtml: ops.length===0 ? '<div class="empty">Este presupuesto no tiene opciones cargadas (barra libre o packs de tragos).</div>' : `
+      <div class="section-hint" style="margin-top:0;"><b>${gxEsc(p.nombreEvento||p.cliente||'Presupuesto')}</b> — ${fmtDate(p.fecha)}. Elegí cuál de las opciones contrató el cliente: se carga el monto total y los datos de personas / tragos en el evento.</div>
+      <div class="field"><label>Evento</label>
+        <select name="eventoId"><option value="">— Elegí el evento —</option>${evs.map(e=>`<option value="${e.id}" ${evInicial===e.id?'selected':''}>${gxEsc(nombreEvento(e))} — ${fmtDate(e.fecha)}</option>`).join('')}</select></div>
+      <div class="field"><label>Opción contratada</label>
+        ${ops.map(o=>`<label class="checkline" style="align-items:flex-start;margin-bottom:6px;"><input type="radio" name="opcion" value="${o.key}" ${asignadoA && asignadoA.presupuestoOpcion===o.key?'checked':''}><span><b>${gxEsc(o.titulo)}</b> — ${fmtMoney(o.total)}<br><span class="section-hint" style="margin:0;">${gxEsc(o.detalle)}</span></span></label>`).join('')}
+      </div>`,
+    onSave: (form)=>{
+      if(ops.length===0) return closeModal(), removeModal(), render();
+      const ev = eventosDe(form.eventoId.value);
+      if(!ev) return avisarError('Elegí el evento al que se asigna.');
+      const key = form.opcion.value;
+      if(!key) return avisarError('Elegí una opción.');
+      const op = ops.find(o=>o.key===key);
+      if(Number(ev.montoTotal)>0 && Number(ev.montoTotal)!==op.total && !confirm(`Este evento ya tiene un monto total de ${fmtMoney(ev.montoTotal)}. ¿Reemplazarlo por ${fmtMoney(op.total)}?`)) return;
+      asignarOpcionPresupuesto(ev, p, key);
+      saveState(); closeModal(); render();
+    },
+    onDelete: null,
+  };
+  render();
+}
+
 function renderPresupuestos(){
   const cfg = state.presupuestoConfig || seedPresupuestoConfig();
-  const rows = [...state.presupuestos].sort((a,b)=>(b.fechaCreacion||0)-(a.fechaCreacion||0));
+  const hoyP = todayStr();
+  const grpP = p=>!p.fecha ? 2 : (p.fecha>=hoyP ? 0 : 1);
+  // primero los eventos que vienen (el más cercano arriba), después los ya pasados (el más reciente primero), al final los sin fecha
+  const rows = [...state.presupuestos].sort((a,b)=>grpP(a)-grpP(b) || (grpP(a)===0 ? a.fecha.localeCompare(b.fecha) : grpP(a)===1 ? b.fecha.localeCompare(a.fecha) : (b.fechaCreacion||0)-(a.fechaCreacion||0)));
   return `
     <div class="row-between">
-      <div><h2 class="section-title">Presupuestos</h2><div class="section-hint">Generá una cotización mixta para un cliente — barra libre, tragos con/sin alcohol y adicionales, sumando solo lo que cargues.</div></div>
+      <div><h2 class="section-title">Presupuestos</h2><div class="section-hint">Generá una cotización mixta para un cliente — barra libre, tragos con/sin alcohol y adicionales, sumando solo lo que cargues. Ordenados por la fecha del evento presupuestado. Cuando el cliente elija, usá "Asignar opción" para pasar esa opción al evento.</div></div>
       <button class="btn" id="btnNuevoPresupuesto">+ Nuevo presupuesto</button>
     </div>
     ${rows.length===0 ? '<div class="empty">Todavía no generaste ningún presupuesto.</div>' : `
     <div class="card" style="padding:0;">
     <table>
-      <thead><tr><th>Fecha creado</th><th>Cliente / evento</th><th>Fecha evento</th><th>Lugar</th><th></th></tr></thead>
+      <thead><tr><th>Fecha del evento</th><th>Cliente / evento</th><th>Lugar</th><th>Opción asignada</th><th>Creado</th><th></th></tr></thead>
       <tbody>
       ${rows.map(p=>`
-        <tr>
-          <td>${new Date(p.fechaCreacion).toLocaleDateString('es-PY')}</td>
-          <td>${p.nombreEvento||p.cliente||'—'}</td>
-          <td>${fmtDate(p.fecha)}</td>
+        <tr ${p.fecha && p.fecha<hoyP ? 'style="opacity:0.7;"' : ''}>
+          <td style="white-space:nowrap;">${fmtDate(p.fecha)}<div class="section-hint" style="margin:0;">${p.fecha?textoDiasEvento(p.fecha):'sin fecha'}</div></td>
+          <td>${gxEsc(p.nombreEvento||p.cliente||'—')}${p.nombreEvento&&p.cliente?`<div class="section-hint" style="margin:0;">${gxEsc(p.cliente)}</div>`:''}</td>
           <td>${p.ciudad?p.ciudad+' — ':''}${p.lugar||'—'}</td>
+          <td>${(()=>{ const ea = state.eventos.find(e=>e.presupuestoId===p.id); if(ea) return `<span class="badge reservado">${gxEsc(ea.presupuestoOpcionTitulo||'asignada')}</span><div class="section-hint" style="margin:2px 0 0;">${fmtMoney(ea.montoTotal)} · ${gxEsc(nombreEvento(ea))}</div>`; const n = opcionesPresupuesto(p).length; return n>1 ? '<span class="badge senado">sin elegir ('+n+' opciones)</span>' : (n===1 ? '<span class="badge posible">1 opción</span>' : '—'); })()}</td>
+          <td style="white-space:nowrap;color:var(--cream-dim);font-size:0.8rem;">${new Date(p.fechaCreacion).toLocaleDateString('es-PY')}</td>
           <td style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button class="btn small" data-asignar-presupuesto="${p.id}">Asignar opción</button>
             <button class="btn small ghost" data-ver-presupuesto="${p.id}">Ver / Imprimir</button>
             <button class="btn small ghost" data-editar-presupuesto="${p.id}">Editar</button>
             <button class="btn small danger" data-eliminar-presupuesto="${p.id}">Eliminar</button>
@@ -3397,7 +3514,7 @@ function sinAlcoholBlockHtml(tiers, cfg){
   `;
 }
 
-function openPresupuestoModal(id){
+function openPresupuestoModal(id, eventoPre){
   if(!state.presupuestoConfig) state.presupuestoConfig = seedPresupuestoConfig();
   const presupuestoExistente = id ? state.presupuestos.find(x=>x.id===id) : null;
   let conCounter = presupuestoExistente && presupuestoExistente.tragosConAlcohol && presupuestoExistente.tragosConAlcohol.length>0 ? presupuestoExistente.tragosConAlcohol.length : 1;
@@ -3408,11 +3525,12 @@ function openPresupuestoModal(id){
     customSubmitLabel: presupuestoExistente ? 'Guardar cambios' : 'Generar presupuesto',
     afterRender: (modalEl)=>{
       const sel = modalEl.querySelector('#pEvento');
+      if(eventoPre && !presupuestoExistente){ sel.value = eventoPre; setTimeout(()=>sel.dispatchEvent(new Event('change')),0); }
       sel.addEventListener('change', ()=>{
         const ev = eventosDe(sel.value);
         if(!ev) return;
         const form = modalEl.querySelector('#modalForm');
-        form.cliente.value = ev.lugar || '';
+        form.cliente.value = ev.cliente || ev.lugar || '';
         form.fecha.value = ev.fecha || '';
         form.lugar.value = ev.lugar || '';
       });
@@ -7675,6 +7793,7 @@ function bindPanelEvents(){
     const p = state.presupuestos.find(x=>x.id===b.dataset.verPresupuesto);
     if(p) renderPresupuestoPrint(p);
   }));
+  panel.querySelectorAll('[data-asignar-presupuesto]').forEach(b=>b.addEventListener('click', ()=>openAsignarOpcionModal(b.dataset.asignarPresupuesto)));
   panel.querySelectorAll('[data-editar-presupuesto]').forEach(b=>b.addEventListener('click', ()=>openPresupuestoModal(b.dataset.editarPresupuesto)));
   panel.querySelectorAll('[data-eliminar-presupuesto]').forEach(b=>b.addEventListener('click', ()=>{
     if(!confirm('¿Eliminar este presupuesto? Esta acción no se puede deshacer.')) return;
